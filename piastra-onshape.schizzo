@@ -1,0 +1,38 @@
+{
+  "app": "schizzo",
+  "v": 1,
+  "units": "mm",
+  "name": "piastra-onshape",
+  "layer": "0",
+  "gridStep": 5,
+  "layers": [
+    { "id": "0", "name": "0 Contorno", "color": "#e8eaef", "visible": true, "locked": false },
+    { "id": "fori", "name": "Fori", "color": "#4db2ff", "visible": true, "locked": false },
+    { "id": "quote", "name": "Quote", "color": "#f0c040", "visible": true, "locked": false }
+  ],
+  "entities": [
+    {
+      "id": "e-contorno",
+      "type": "polyline",
+      "closed": true,
+      "layer": "0",
+      "points": [
+        { "x": 0, "y": 6, "bulge": 0.41421356 },
+        { "x": 6, "y": 0, "bulge": 0 },
+        { "x": 74, "y": 0, "bulge": 0.41421356 },
+        { "x": 80, "y": 6, "bulge": 0 },
+        { "x": 80, "y": 44, "bulge": 0.41421356 },
+        { "x": 74, "y": 50, "bulge": 0 },
+        { "x": 6, "y": 50, "bulge": 0.41421356 },
+        { "x": 0, "y": 44, "bulge": 0 }
+      ]
+    },
+    { "id": "e-f1", "type": "circle", "cx": 10, "cy": 10, "r": 3, "layer": "fori" },
+    { "id": "e-f2", "type": "circle", "cx": 70, "cy": 10, "r": 3, "layer": "fori" },
+    { "id": "e-f3", "type": "circle", "cx": 70, "cy": 40, "r": 3, "layer": "fori" },
+    { "id": "e-f4", "type": "circle", "cx": 10, "cy": 40, "r": 3, "layer": "fori" },
+    { "id": "e-d1", "type": "dimension", "x1": 0, "y1": 0, "x2": 80, "y2": 0, "offset": -12, "layer": "quote" },
+    { "id": "e-d2", "type": "dimension", "x1": 0, "y1": 0, "x2": 0, "y2": 50, "offset": -12, "layer": "quote" },
+    { "id": "e-d3", "type": "dimension", "x1": 7, "y1": 10, "x2": 13, "y2": 10, "offset": 8, "prefix": "Ø", "layer": "quote" }
+  ]
+}

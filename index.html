@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
+  <title>Schizzo — CAD 2D per Onshape</title>
+  <meta name="description" content="CAD 2D di precisione: profili chiusi in millimetri, DXF R2000 per Onshape." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23f5a623'/%3E%3Cpath d='M3 12.5 L8 3.5 L13 12.5' stroke='%231a1204' stroke-width='1.7' fill='none'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 12.5 L8 3.5 L13 12.5" stroke="#1a1204" stroke-width="1.7" stroke-linejoin="round"/>
+            <circle cx="8" cy="9.5" r="1.4" fill="#1a1204"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-name">Schizzo</div>
+          <div class="brand-sub">Foto → CAD → Onshape</div>
+        </div>
+      </div>
+      <input id="dwg-name" class="name-input" value="senza-nome" spellcheck="false" title="Nome del disegno" />
+
+      <button class="tbtn" id="btn-new" title="Nuovo disegno">Nuovo</button>
+      <button class="tbtn" id="btn-open" title="Apri progetto .schizzo">Apri</button>
+      <button class="tbtn" id="btn-save" title="Salva progetto">Salva</button>
+      <input type="file" id="file-open" accept=".schizzo,.json,.svg,.dxf,image/*" hidden />
+      <input type="file" id="file-photo" accept="image/*" hidden />
+      <button class="tbtn" id="btn-photo" title="Importa una foto e genera lo schizzo CAD">Da foto</button>
+
+      <div class="sep"></div>
+
+      <button class="icon-btn" id="btn-undo" title="Annulla (Ctrl+Z)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h7a3 3 0 010 6H8"/><path d="M4 7l3-3M4 7l3 3"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-redo" title="Ripeti (Ctrl+Y)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 7H5a3 3 0 000 6h3"/><path d="M12 7l-3-3M12 7l-3 3"/></svg>
+      </button>
+
+      <div class="sep"></div>
+
+      <button class="icon-btn" id="btn-move" data-cmd="move" title="Sposta (M)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2v12M2 8h12M8 2l2.2 2.2M8 2L5.8 4.2M8 14l2.2-2.2M8 14l-2.2-2.2M2 8l2.2-2.2M2 8l2.2 2.2M14 8l-2.2-2.2M14 8l-2.2 2.2"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-rotate" data-cmd="rotate" title="Ruota (RO)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 8a5 5 0 11-1.4-3.4"/><path d="M13 3.5V8h-4.5"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-scale" data-cmd="scale" title="Scala">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="6" height="6"/><rect x="7" y="3" width="6" height="6"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-mirror" data-cmd="mirror" title="Specchia">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2v12M4 5l3 3-3 3M12 5l-3 3 3 3"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-copy" title="Copia con punto base">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="7" height="7"/><path d="M8 5V3h5v7H11"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-dup" title="Duplica (Ctrl+D)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="5" width="8" height="8"/><path d="M5 11H3V3h8v2"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-del" title="Elimina (Canc)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h10M6 5V3.5h4V5M6.5 7v5M9.5 7v5M4.5 5l.7 8h5.6l.7-8"/></svg>
+      </button>
+
+      <div class="sep"></div>
+
+      <button class="icon-btn" id="tog-grid" title="Griglia (G)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 3h4v4H3zM9 3h4v4H9zM3 9h4v4H3zM9 9h4v4H9z"/></svg></button>
+      <button class="icon-btn" id="tog-snap" title="Snap oggetti (F3)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="2.2"/><path d="M8 2v2.5M8 11.5V14M2 8h2.5M11.5 8H14"/></svg></button>
+      <button class="icon-btn" id="tog-ortho" title="Ortogonale (F8)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 13V4h9"/><path d="M3 13h9"/></svg></button>
+      <button class="icon-btn" id="tog-polar" title="Tracciamento polare 45° (F10)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11M4.1 4.1l7.8 7.8M11.9 4.1L4.1 11.9"/></svg></button>
+      <button class="icon-btn" id="btn-fit" title="Adatta alla vista (F)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6V3h3M10 3h3v3M13 10v3h-3M6 13H3v-3"/></svg></button>
+      <button class="icon-btn" id="btn-3d" title="Anteprima 3D estrusa"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2l6 3.5v5L8 14 2 10.5v-5z"/><path d="M8 8.5V14M8 8.5L14 5.5M8 8.5L2 5.5"/></svg></button>
+
+      <div class="grow"></div>
+      <button class="icon-btn" id="btn-side" title="Pannello proprietà">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M3 8h10M3 12h7"/></svg>
+      </button>
+
+      <div class="units">
+        Unità
+        <select id="sel-units" title="Unità del disegno (Onshape le rispetta)">
+          <option value="mm" selected>mm</option>
+          <option value="cm">cm</option>
+          <option value="in">inch</option>
+        </select>
+      </div>
+
+      <div class="sep"></div>
+      <button class="tbtn" id="btn-png">PNG</button>
+      <button class="tbtn" id="btn-svg">SVG</button>
+      <button class="tbtn primary" id="btn-dxf" title="Formato nativo per schizzi Onshape">DXF Onshape</button>
+      <button class="tbtn" id="btn-stl" title="STL dell’estrusione 3D">STL</button>
+      <button class="tbtn" id="btn-dwg" title="Informazioni su DWG e Onshape">DWG</button>
+      <button class="icon-btn" id="btn-help" title="Guida (?)">?</button>
+    </header>
+
+    <div class="main">
+      <nav class="tools" id="tools">
+        <button class="icon-btn active" data-tool="select" title="Seleziona (S / Esc)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 3l8 5.2-3.6.6 2.4 5.2-1.8.8-2.4-5.2L4 12.5z" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="pan" title="Sposta vista (Spazio)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="5" width="8" height="10" rx="2"/><path d="M8 5V4a1 1 0 012 0v1M7 9h4"/></svg>
+        </button>
+        <div class="tool-gap"></div>
+        <button class="icon-btn" data-tool="line" title="Linea (L)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 14L14 4"/><circle cx="4" cy="14" r="1.3" fill="currentColor"/><circle cx="14" cy="4" r="1.3" fill="currentColor"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="polyline" title="Polilinea (PL)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 13L7 5l5 6 3-8"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="rect" title="Rettangolo (R)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="5" width="11" height="8"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="circle" title="Cerchio (C)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="9" r="5.5"/><circle cx="9" cy="9" r="1" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="arc" title="Arco 3 punti (A)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3.5 12.5a6.5 6.5 0 0111-4.5"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="ellipse" title="Ellisse">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7"><ellipse cx="9" cy="9" rx="6.5" ry="4"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="polygon" title="Poligono regolare">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M9 2.8 L15.2 7.2 L12.8 14.6 H5.2 L2.8 7.2 Z"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="spline" title="Spline (punti di passaggio)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 13c2-8 4 4 6-2s3 6 6-4"/></svg>
+        </button>
+        <div class="tool-gap"></div>
+        <button class="icon-btn" data-tool="dimension" title="Quota allineata (D)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 14V4M15 14V4M3 6h12"/><path d="M3 6l2-1.5M3 6l2 1.5M15 6l-2-1.5M15 6l-2 1.5"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="measure" title="Misura (DI)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 14L15 4"/><path d="M3 14h3M15 4h-3"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="text" title="Testo">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5h10M9 5v9"/></svg>
+        </button>
+        <div class="tool-gap"></div>
+        <button class="icon-btn" data-tool="fillet" title="Raccordo angoli (Fillets per Onshape)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 14V8.5A4.5 4.5 0 018.5 4H14"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="trim" title="Taglia / Estendi (TR, Shift=estendi)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h7M3 12h12M10 3v6M15 9v6"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="break" title="Spezza linea (BR)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 13L8 8M10 8l5-5"/><circle cx="9" cy="8" r="1.4" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button class="icon-btn" data-tool="offset" title="Offset (OF)">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="10" height="10" rx="1"/><rect x="6.5" y="6.5" width="5" height="5" rx="0.5"/></svg>
+        </button>
+        <button class="icon-btn" id="btn-array" title="Serie rettangolare o polare">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="5" cy="5" r="1.6"/><circle cx="13" cy="5" r="1.6"/><circle cx="5" cy="13" r="1.6"/><circle cx="13" cy="13" r="1.6"/></svg>
+        </button>
+      </nav>
+
+      <div class="workspace">
+        <canvas id="c"></canvas>
+        <div class="empty" id="empty">
+          <div class="empty-card">
+            <h2>Foto o schizzo → CAD</h2>
+            <p>Carica un’immagine, descrivi misure e spessore, ottieni profili chiusi in millimetri. Poi DXF in Onshape o STL.</p>
+            <button class="btn-block accent" id="empty-photo" style="margin-bottom:12px">Carica foto e descrivi il pezzo</button>
+            <div class="empty-grid">
+              <button class="tpl" data-tpl="door"><b>Porta da foto</b><span>Anta 800×2100, maniglia, telaio</span></button>
+              <button class="tpl" data-tpl="plate"><b>Piastra forata</b><span>80×50 mm, 4 fori Ø6</span></button>
+              <button class="tpl" data-tpl="flange"><b>Flangia</b><span>Ø80, corona 4 fori</span></button>
+              <button class="tpl" data-tpl="bracket"><b>Staffa a L</b><span>60×40, spessore 10</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="hint" id="hint">Seleziona uno strumento oppure premi <kbd>L</kbd> linea · <kbd>C</kbd> cerchio · <kbd>R</kbd> rettangolo · <kbd>F</kbd> adatta vista</div>
+        <div class="measure" id="measure" hidden></div>
+      </div>
+
+      <aside class="side">
+        <div class="tabs">
+          <button class="tab active" data-panel="props">Proprietà</button>
+          <button class="tab" data-panel="layers">Livelli</button>
+          <button class="tab" data-panel="export">Esporta</button>
+        </div>
+
+        <div class="panel active" id="panel-props">
+          <div class="h">Disegno</div>
+          <div class="stat"><span>Entità</span><b id="st-ents">0</b></div>
+          <div class="stat ok" id="st-closed-row"><span>Profili chiusi</span><b id="st-closed">0</b></div>
+          <div class="stat"><span>Area profili</span><b id="st-area">0</b></div>
+          <div class="stat"><span>Selezionate</span><b id="st-sel">0</b></div>
+
+          <div class="h">Entità selezionata</div>
+          <div id="props-box" class="props-empty">Nessuna selezione. Clicca un oggetto o disegna un profilo chiuso da estrudere in Onshape.</div>
+
+          <div class="h">Poligono</div>
+          <div class="field">
+            <label>Lati</label>
+            <input type="number" id="poly-sides" min="3" max="64" value="6" />
+          </div>
+          <label class="check"><input type="checkbox" id="poly-inscribed" checked /> Vertici sul cerchio</label>
+          <div class="h">Testo</div>
+          <div class="field">
+            <label>Altezza (unità)</label>
+            <input type="number" id="text-h" min="0.5" step="0.5" value="4" />
+          </div>
+          <div class="h">Raccordo</div>
+          <div class="field">
+            <label>Raggio</label>
+            <input type="number" id="fillet-r" min="0.1" step="0.5" value="3" />
+          </div>
+          <button class="btn-block" id="btn-fillet-sel">Raccorda selezione</button>
+          <button class="btn-block" id="btn-chamfer-sel">Smussa selezione</button>
+          <button class="btn-block" id="btn-join">Unisci linee in polilinea</button>
+          <button class="btn-block" id="btn-explode">Esplodi in tratti</button>
+          <div class="h">Offset</div>
+          <div class="field">
+            <label>Distanza</label>
+            <input type="number" id="offset-d" min="0.01" step="0.5" value="2" />
+          </div>
+          <button class="btn-block" id="btn-offset-out">Offset esterno</button>
+          <button class="btn-block" id="btn-offset-in">Offset interno</button>
+          <div class="h">Serie</div>
+          <div class="row">
+            <div class="field"><label>Nx / N polare</label><input type="number" id="arr-n" min="1" value="4" /></div>
+            <div class="field"><label>Ny</label><input type="number" id="arr-ny" min="1" value="2" /></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Passo X</label><input type="number" id="arr-dx" step="0.5" value="20" /></div>
+            <div class="field"><label>Passo Y</label><input type="number" id="arr-dy" step="0.5" value="20" /></div>
+          </div>
+          <button class="btn-block" id="btn-array-rect">Serie rettangolare</button>
+          <button class="btn-block" id="btn-array-polar">Serie polare (poi clicca il centro)</button>
+          <button class="btn-block ghost" id="btn-origin">Origine sul punto cliccato</button>
+          <div class="h">Griglia</div>
+          <div class="field">
+            <label>Passo</label>
+            <input type="number" id="grid-step" min="0.1" step="0.5" value="5" />
+          </div>
+        </div>
+
+        <div class="panel" id="panel-layers">
+          <div class="h">Livelli</div>
+          <div id="layer-list"></div>
+          <button class="btn-block" id="btn-add-layer">+ Nuovo livello</button>
+          <button class="btn-block" id="btn-layer-sel">Assegna selezione al livello</button>
+          <p class="props-empty" style="margin-top:12px">I fori su un livello separato restano cerchi esatti nel DXF: Onshape li riconosce come feature da estrudere o tagliare.</p>
+        </div>
+
+        <div class="panel" id="panel-export">
+          <div class="h">Onshape</div>
+          <p class="help-list" style="margin-bottom:10px">Esporta in <b style="color:var(--text)">DXF millimetri</b>, poi in Onshape: <em>Inserisci → Importa</em> nel Part Studio, oppure importa lo schizzo su un piano e usa <em>Estrudi</em>.</p>
+          <label class="check"><input type="checkbox" id="ex-sel" /> Solo selezione</label>
+          <label class="check"><input type="checkbox" id="ex-dim" /> Includi quote e testo</label>
+          <div class="h">PNG</div>
+          <div class="field">
+            <label>Sfondo</label>
+            <select id="png-bg">
+              <option value="white">Bianco (stampa)</option>
+              <option value="transparent">Trasparente</option>
+              <option value="dark">Scuro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Risoluzione</label>
+            <select id="png-dpi">
+              <option value="96">Schermo (96 dpi)</option>
+              <option value="150" selected>150 dpi</option>
+              <option value="300">Stampa 300 dpi</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Spessore 3D / STL (mm)</label>
+            <input type="number" id="ex-th" min="0.2" step="0.5" value="40" />
+          </div>
+          <button class="btn-block accent" id="ex-dxf">Scarica DXF</button>
+          <button class="btn-block" id="ex-stl">Scarica STL</button>
+          <button class="btn-block" id="ex-png">Scarica PNG</button>
+          <button class="btn-block" id="ex-svg">Scarica SVG</button>
+          <button class="btn-block ghost" id="ex-dwg">Info DWG…</button>
+
+          <div class="h">Foto → CAD</div>
+          <p class="help-list" style="margin-bottom:10px">Come in Ragnar: foto + testo (misure, spessore, maniglia…) → schizzo editabile. Raffina a parole nella riga comando.</p>
+          <button class="btn-block accent" id="ex-photo">Nuovo da foto + testo…</button>
+          <div class="h">Modelli pronti</div>
+          <button class="tpl" data-tpl="door"><b>Porta da foto</b><span>Anta 800×2100 mm, maniglia H1019</span></button>
+          <button class="tpl" data-tpl="plate"><b>Piastra forata</b><span>80×50 mm, 4 fori Ø6</span></button>
+          <button class="tpl" data-tpl="flange"><b>Flangia</b><span>Ø80 / Ø36, 4 fori su corona</span></button>
+          <button class="tpl" data-tpl="bracket"><b>Staffa a L</b><span>Profilo chiuso 60×40, sp. 10</span></button>
+          <button class="tpl" data-tpl="channel"><b>Profilo a U</b><span>Canale 50×30, sp. 4</span></button>
+          <button class="tpl" data-tpl="gasket"><b>Guarnizione</b><span>Anello Ø60 / Ø40</span></button>
+          <button class="tpl" data-tpl="rounded"><b>Piastra raccordata</b><span>80×50, R6, 4 fori Ø5</span></button>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="status">
+      <span class="coord" id="coord">X 0.00&nbsp;&nbsp;Y 0.00</span>
+      <span class="tag" id="tag-snap">SNAP</span>
+      <span class="tag" id="tag-ortho">ORTHO</span>
+      <span class="tag" id="tag-polar">POLAR</span>
+      <span class="tag" id="tag-grid">GRID</span>
+      <span id="snap-label"></span>
+      <div class="cmd">
+        <label for="cmd">Comando</label>
+        <input id="cmd" placeholder="100,50  ·  @20,0  ·  oppure: spessore 40  ·  maniglia 1050" autocomplete="off" spellcheck="false" />
+      </div>
+      <span id="zoom-label">100%</span>
+    </footer>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="modal" id="modal"></div>
+  </div>
+  <div class="studio" id="studio" hidden>
+    <div class="studio-card">
+      <div class="studio-head">
+        <div>
+          <div class="studio-kicker">Foto → CAD</div>
+          <h2>Carica un’immagine, descrivi il pezzo</h2>
+        </div>
+        <button class="icon-btn" id="studio-close" title="Chiudi">×</button>
+      </div>
+      <div class="studio-grid">
+        <div class="studio-drop" id="studio-drop">
+          <img id="studio-preview" alt="" hidden />
+          <div class="studio-drop-msg" id="studio-drop-msg">
+            Trascina qui una foto, uno schizzo o un disegno tecnico<br /><span>oppure clicca per scegliere il file</span>
+          </div>
+        </div>
+        <div class="studio-form">
+          <label for="studio-prompt">Cosa vuoi ottenere</label>
+          <textarea id="studio-prompt" rows="6" placeholder="Porta interna 800×2100 mm, spessore 40, maniglia a 1050 a sinistra…"></textarea>
+          <div class="field">
+            <label>Spessore estrusione (mm)</label>
+            <input type="number" id="studio-th" min="0.2" step="0.5" value="40" />
+          </div>
+          <p class="help-list">La foto dà forma e proporzioni. Il testo dà le misure. Poi raffini a parole e esporti DXF (Onshape) o STL.</p>
+          <button class="btn-block accent" id="studio-go">Genera modello</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ctx" id="ctx"></div>
+
+  <script src="export.js"></script>
+  <script src="trace.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,207 @@
+{
+  "app": "schizzo",
+  "v": 1,
+  "units": "mm",
+  "name": "porta-interna",
+  "layer": "0",
+  "gridStep": 50,
+  "layers": [
+    {
+      "id": "0",
+      "name": "0 Contorno",
+      "color": "#e8eaef",
+      "visible": true
+    },
+    {
+      "id": "ferramenta",
+      "name": "Ferramenta",
+      "color": "#c084fc",
+      "visible": true
+    },
+    {
+      "id": "foto",
+      "name": "Foto",
+      "color": "#8b93a7",
+      "visible": true
+    },
+    {
+      "id": "quote",
+      "name": "Quote",
+      "color": "#f0c040",
+      "visible": true
+    }
+  ],
+  "entities": [
+    {
+      "type": "image",
+      "x": 0,
+      "y": 0,
+      "w": 1024,
+      "h": 2261,
+      "src": "porta.jpg",
+      "opacity": 0.4,
+      "layer": "foto",
+      "id": "e0"
+    },
+    {
+      "type": "polyline",
+      "closed": true,
+      "layer": "0",
+      "points": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 1024,
+          "y": 0
+        },
+        {
+          "x": 1024,
+          "y": 2261
+        },
+        {
+          "x": 0,
+          "y": 2261
+        }
+      ],
+      "id": "e1"
+    },
+    {
+      "type": "rect",
+      "x": 110,
+      "y": 33,
+      "w": 800,
+      "h": 2100,
+      "rot": 0,
+      "layer": "0",
+      "id": "e2"
+    },
+    {
+      "type": "circle",
+      "cx": 157,
+      "cy": 1052,
+      "r": 18,
+      "layer": "ferramenta",
+      "id": "e3"
+    },
+    {
+      "type": "rect",
+      "x": 157,
+      "y": 1042,
+      "w": 128,
+      "h": 20,
+      "rot": 0,
+      "layer": "ferramenta",
+      "id": "e4"
+    },
+    {
+      "type": "rect",
+      "x": 144,
+      "y": 946,
+      "w": 26,
+      "h": 32,
+      "rot": 0,
+      "layer": "ferramenta",
+      "id": "e5"
+    },
+    {
+      "type": "circle",
+      "cx": 157,
+      "cy": 962,
+      "r": 6,
+      "layer": "ferramenta",
+      "id": "e6"
+    },
+    {
+      "type": "rect",
+      "x": 906,
+      "y": 268,
+      "w": 20,
+      "h": 30,
+      "rot": 0,
+      "layer": "ferramenta",
+      "id": "e7"
+    },
+    {
+      "type": "rect",
+      "x": 906,
+      "y": 1068,
+      "w": 20,
+      "h": 30,
+      "rot": 0,
+      "layer": "ferramenta",
+      "id": "e8"
+    },
+    {
+      "type": "rect",
+      "x": 906,
+      "y": 1868,
+      "w": 20,
+      "h": 30,
+      "rot": 0,
+      "layer": "ferramenta",
+      "id": "e9"
+    },
+    {
+      "type": "dimension",
+      "x1": 0,
+      "y1": 0,
+      "x2": 1024,
+      "y2": 0,
+      "offset": -50,
+      "layer": "quote",
+      "id": "e10"
+    },
+    {
+      "type": "dimension",
+      "x1": 0,
+      "y1": 0,
+      "x2": 0,
+      "y2": 2261,
+      "offset": -50,
+      "layer": "quote",
+      "id": "e11"
+    },
+    {
+      "type": "dimension",
+      "x1": 110,
+      "y1": 33,
+      "x2": 910,
+      "y2": 33,
+      "offset": 30,
+      "layer": "quote",
+      "id": "e12"
+    },
+    {
+      "type": "dimension",
+      "x1": 910,
+      "y1": 33,
+      "x2": 910,
+      "y2": 2133,
+      "offset": 30,
+      "layer": "quote",
+      "id": "e13"
+    },
+    {
+      "type": "dimension",
+      "x1": 110,
+      "y1": 33,
+      "x2": 110,
+      "y2": 1052,
+      "offset": -30,
+      "layer": "quote",
+      "id": "e14"
+    },
+    {
+      "type": "text",
+      "x": 20,
+      "y": 2283,
+      "text": "Porta interna a battente · anta 800×2100 · maniglia H 1019 · backset 47",
+      "height": 16,
+      "rot": 0,
+      "layer": "quote",
+      "id": "e15"
+    }
+  ]
+}
