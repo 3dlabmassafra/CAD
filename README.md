@@ -95,4 +95,4 @@ node --test tests/*.test.js
 
 Una singola vista non contiene informazioni sufficienti per ricostruire la profondità o correggere una prospettiva sconosciuta. Le quote dichiarate dall’utente sono vincoli; i dettagli dedotti dalla foto restano stime da verificare prima di fabbricare. L’immagine viene elaborata localmente nel browser.
 
-Il workflow GitHub Pages pubblica il sito quando viene aggiornato `main` o il branch Arena della sessione.
+Il workflow GitHub Pages pubblica il sito quando viene aggiornato `main` o il branch Arena della sessione, se Pages è già abilitato nel repository (Settings → Pages → Source: GitHub Actions).

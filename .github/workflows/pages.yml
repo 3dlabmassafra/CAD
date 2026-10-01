@@ -18,6 +18,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event.repository.has_pages == true
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -27,8 +28,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
