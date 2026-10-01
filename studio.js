@@ -206,8 +206,9 @@
       drawOverlay();
       renderParams();
       renderEvidence();
+      regenerate();                 /* prepara subito il disegno per il passo 3 */
       updateActionBar();
-      setStep(3);
+      setStep(2);                   /* prima si controllano le misure, poi la tavola */
     } finally {
       state.busy = false;
     }
@@ -316,8 +317,7 @@
         const val = el.tagName === "SELECT" ? el.value : parseFloat(el.value);
         if (val === "" || (typeof val === "number" && !Number.isFinite(val))) return;
         state.params[id] = val;
-        regenerate();
-        renderParams();
+        regenerate();               /* solo il disegno: il campo resta a fuoco */
       });
     });
 
@@ -514,6 +514,7 @@
     $("btn-gen").addEventListener("click", () => {
       if (!state.built) regenerate();
       setStep(3);
+      setTimeout(() => $("sheet").scrollIntoView({ behavior: "smooth", block: "center" }), 60);
     });
     $("dl-svg").addEventListener("click", exportSVG);
     $("dl-png").addEventListener("click", exportPNG);
