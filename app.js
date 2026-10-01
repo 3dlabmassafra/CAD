@@ -3115,22 +3115,45 @@
   if ($("studio-go")) $("studio-go").onclick = () => {
     const f = studioFile;
     if (!f) { hintEl.textContent = "Carica prima una foto."; return; }
-    window._schizzoPrompt = ($("studio-prompt") && $("studio-prompt").value) || "";
-    const th = parseFloat($("studio-th") && $("studio-th").value);
-    if (Number.isFinite(th) && th > 0) {
-      window._schizzoPrompt += (window._schizzoPrompt ? ", " : "") + "spessore " + th;
-      state.thickness = th;
+    const prompt = ($("studio-prompt") && $("studio-prompt").value) || "";
+    const parsed = SchizzoTrace.parsePrompt(prompt);
+    const readOptional = (id, label) => {
+      const input = $(id);
+      const raw = input ? String(input.value).trim() : "";
+      if (!raw) return { value: null, error: null };
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value <= 0) return { value: null, error: `${label} deve essere un numero maggiore di zero.` };
+      return { value, error: null };
+    };
+    const widthField = readOptional("studio-w", "La larghezza");
+    const heightField = readOptional("studio-h", "L’altezza");
+    const thicknessField = readOptional("studio-th", "Lo spessore");
+    const invalid = widthField.error || heightField.error || thicknessField.error || (thicknessField.value != null && thicknessField.value < 0.2);
+    if (invalid) {
+      showModal("Controlla le misure", `<p>${invalid || "Lo spessore minimo è 0,2 mm."}</p>`, [{ label: "Ok", primary: true }]);
+      return;
     }
+    const width = widthField.value || parsed.w || null;
+    const height = heightField.value || parsed.h || null;
+    const allowEstimate = !!($("studio-estimate") && $("studio-estimate").checked);
+    if (!width && !height && !allowEstimate) {
+      showModal("Serve una misura reale", "<p>Inserisci la larghezza o l’altezza reale in millimetri. Con una sola quota il disegno mantiene le proporzioni della foto; con due quote entrambe le misure sono vincolate.</p><p>Se non hai ancora una misura, puoi attivare la scala indicativa, ma il risultato non sarà adatto alla produzione finché non lo ricalibri.</p>", [{ label: "Ho capito", primary: true }]);
+      return;
+    }
+    const options = { width, height, allowEstimate };
+    const kind = $("studio-kind") && $("studio-kind").value;
+    if (kind && kind !== "auto") options.kind = kind;
+    if (thicknessField.value != null) options.thickness = thicknessField.value;
+    window._schizzoPrompt = prompt;
     closeStudio();
-    importPhotoFile(f);
+    importPhotoFile(f, options, prompt);
   };
   if ($("file-photo")) $("file-photo").onchange = (e) => {
     const f = e.target.files[0];
     e.target.value = "";
     if (!f) return;
-    const st = $("studio");
-    if (st && !st.hidden) studioSetFile(f);
-    else importPhotoFile(f);
+    if ($("studio") && $("studio").hidden) openStudio();
+    studioSetFile(f);
   };
 
   $("btn-png").onclick = () => exportPNG();
@@ -3448,7 +3471,8 @@
     refreshUI();
   }
 
-  function importPhotoFile(file) {
+  function importPhotoFile(file, generationOptions, promptText) {
+    const options = generationOptions || {};
     const run = () => {
       const reader = new FileReader();
       reader.onload = () => {
@@ -3458,10 +3482,10 @@
           try {
             ensureLayer("ferramenta", "Ferramenta", "#c084fc", false);
             ensureLayer("foto", "Foto", "#8b93a7", true);
-            const prompt = (window._schizzoPrompt || "").trim();
+            const prompt = String(promptText != null ? promptText : (window._schizzoPrompt || "")).trim();
             const built = SchizzoTrace.generateFromImage
-              ? SchizzoTrace.generateFromImage(im, prompt)
-              : SchizzoTrace.entitiesFromTrace(SchizzoTrace.tracePhoto(im));
+              ? SchizzoTrace.generateFromImage(im, prompt, options)
+              : SchizzoTrace.entitiesFromTrace(SchizzoTrace.tracePhoto(im), options);
             if (!built || !built.entities.length) throw new Error("Nessun oggetto riconoscibile sulla foto.");
             if (built.thickness) state.thickness = built.thickness;
             if ($("ex-th")) $("ex-th").value = state.thickness;
@@ -3477,24 +3501,27 @@
             state.gridStep = built.kind === "door" ? 50 : 5;
             pushHist();
             markSaved();
+            state.view3d = false;
+            if ($("btn-3d")) $("btn-3d").classList.remove("active");
             fitView();
             refreshUI();
-            state.view3d = true;
-            if ($("btn-3d")) $("btn-3d").classList.add("active");
-            hintEl.textContent = built.note || "Modello generato dalla foto";
+            renderPhotoQuality(built);
+            document.querySelector('[data-panel="export"]').click();
+            hintEl.textContent = built.note || "Disegno generato dalla foto: controlla proporzioni e quote.";
           } catch (err) {
-            showModal("Foto non convertita", `<p>${err.message || err}</p>`, [{ label: "Ok", primary: true }]);
+            showModal("Foto non convertita", `<p>${String(err.message || err).replace(/[<>]/g, "")}</p>`, [{ label: "Ok", primary: true }]);
           }
         };
         im.onerror = () => showModal("Foto non letta", "<p>Formato immagine non supportato.</p>", [{ label: "Ok", primary: true }]);
         im.src = src;
         imgCache.set(src, im);
       };
+      reader.onerror = () => showModal("Foto non letta", "<p>Il browser non è riuscito a leggere il file selezionato.</p>", [{ label: "Ok", primary: true }]);
       reader.readAsDataURL(file);
     };
     if (state.entities.length) {
-      showModal("Generare lo schizzo da foto?",
-        `<p>Sostituisce il disegno corrente (${state.entities.length} oggetti) con il CAD ricavato dalla foto.</p>`,
+      showModal("Generare il disegno dalla foto?",
+        `<p>Sostituisce il disegno corrente (${state.entities.length} oggetti) con il prospetto CAD ricavato dall'immagine.</p>`,
         [
           { label: "Annulla" },
           { label: "Genera", primary: true, fn: () => { hideModal(); run(); } }
@@ -3502,10 +3529,38 @@
     } else run();
   }
 
+  function renderPhotoQuality(built) {
+    const card = $("photo-quality");
+    if (!card) return;
+    const q = built && built.quality;
+    const warnings = built && Array.isArray(built.warnings) ? built.warnings : [];
+    const title = $("photo-quality-title");
+    const summary = $("photo-quality-summary");
+    const list = $("photo-quality-list");
+    card.hidden = false;
+    card.classList.toggle("quality-warning", !q || q.estimated || warnings.length > 1);
+    if (title) title.textContent = !q || q.estimated
+      ? "Scala indicativa — verifica prima dell'uso"
+      : (q.inputWidth && q.inputHeight ? "Dimensioni calibrate su due quote" : "Scala calibrata su una quota reale");
+    if (summary) {
+      const w = q && Number.isFinite(q.overallWidth) ? q.overallWidth : built.width;
+      const h = q && Number.isFinite(q.overallHeight) ? q.overallHeight : built.height;
+      summary.textContent = `Ingombro CAD: ${Number(w).toFixed(1)} × ${Number(h).toFixed(1)} mm. Le quote esplicite sono state applicate; ogni quota non fornita deriva dalla proporzione della foto.`;
+    }
+    if (list) {
+      list.replaceChildren();
+      warnings.forEach((warning) => {
+        const li = document.createElement("li");
+        li.textContent = warning;
+        list.appendChild(li);
+      });
+    }
+  }
+
   function openFile(file) {
     const go = () => {
     const isImg = /\.(png|jpe?g|gif|webp|bmp)$/i.test(file.name) || (file.type || "").startsWith("image/");
-    if (isImg) { importPhotoFile(file); return; }
+    if (isImg) { openStudio(); studioSetFile(file); return; }
     const reader = new FileReader();
     reader.onload = () => {
       try {
@@ -3632,7 +3687,8 @@
     const list = state.entities.filter((e) => {
       if (opts.selectionIds && !opts.selectionIds.includes(e.id)) return false;
       if (!layerVisible(e.layer)) return false;
-      if (e.type === "dimension" && !opts.includeDimensions) return false;
+      if ((e.type === "dimension" || e.type === "text") && !opts.includeDimensions) return false;
+      if (e.type === "image" && !($("ex-photo-underlay") && $("ex-photo-underlay").checked)) return false;
       return true;
     });
     const bb = SchizzoExport.bboxOf(list.length ? list : state.entities);
@@ -3640,9 +3696,17 @@
     const wMm = Math.max(1, bb.maxX - bb.minX + pad * 2);
     const hMm = Math.max(1, bb.maxY - bb.minY + pad * 2);
     const dpi = parseFloat($("png-dpi").value) || 150;
-    const pxPerMm = state.units === "in" ? dpi : dpi / 25.4;
-    const W = Math.max(32, Math.round(wMm * pxPerMm));
-    const H = Math.max(32, Math.round(hMm * pxPerMm));
+    let pxPerMm = state.units === "in" || state.units === "inch" || state.units === "inches" ? dpi : state.units === "cm" ? dpi / 2.54 : state.units === "m" ? dpi / 1000 : dpi / 25.4;
+    let W = Math.max(32, Math.round(wMm * pxPerMm));
+    let H = Math.max(32, Math.round(hMm * pxPerMm));
+    const requestedW = W, requestedH = H;
+    const pixelScale = Math.min(1, 16000 / Math.max(W, H), Math.sqrt(35_000_000 / (W * H)));
+    if (pixelScale < 1) {
+      W = Math.max(32, Math.floor(W * pixelScale));
+      H = Math.max(32, Math.floor(H * pixelScale));
+      pxPerMm *= pixelScale;
+      hintEl.textContent = `PNG ridotto a ${W}×${H} px per evitare un file troppo pesante (richiesti ${requestedW}×${requestedH}).`;
+    }
     const off = document.createElement("canvas");
     off.width = W; off.height = H;
     const g = off.getContext("2d");
@@ -3698,6 +3762,39 @@
           g.stroke();
           break;
         }
+        case "text": {
+          g.save();
+          g.fillStyle = bg === "white" ? "#111111" : colorOf(e);
+          g.font = `${e.height || 4}px IBM Plex Sans, sans-serif`;
+          g.translate(e.x, e.y);
+          g.scale(1, -1);
+          g.rotate(-(e.rot || 0));
+          g.fillText(e.text || "", 0, 0);
+          g.restore();
+          break;
+        }
+        case "dimension": {
+          const d = SchizzoExport.dimensionPrimitives(e);
+          const col = bg === "white" ? "#111111" : colorOf(e);
+          g.save();
+          g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 0.2;
+          [[d.a, d.p1], [d.b, d.p2], [d.p1, d.p2]].forEach(([a, b]) => {
+            g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+          });
+          [d.arrow1, d.arrow2].forEach((pts) => {
+            g.beginPath(); g.moveTo(pts[0].x, pts[0].y);
+            pts.slice(1).forEach((p) => g.lineTo(p.x, p.y));
+            g.closePath(); g.fill();
+          });
+          g.translate(d.labelX, d.labelY);
+          g.scale(1, -1);
+          g.rotate(-d.textAngle * Math.PI / 180);
+          g.font = "3.5px IBM Plex Mono, monospace";
+          g.textAlign = "center";
+          g.fillText(d.label + " " + state.units, 0, 0);
+          g.restore();
+          break;
+        }
         case "image": {
           const im = imageOf(e);
           if (im && im.complete && im.naturalWidth) {
@@ -3716,6 +3813,10 @@
     list.forEach(stroke);
     g.restore();
     off.toBlob((blob) => {
+      if (!blob) {
+        showModal("PNG non esportato", "<p>Il browser non è riuscito a creare l’immagine. Riduci la risoluzione o esporta in SVG.</p>", [{ label: "Ok", primary: true }]);
+        return;
+      }
       SchizzoExport.download((state.name || "schizzo") + ".png", blob, "image/png");
     }, "image/png");
   }

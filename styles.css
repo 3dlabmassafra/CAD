@@ -533,3 +533,34 @@ button:disabled { opacity: 0.4; cursor: default; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: #2c3546; border-radius: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* Image-to-CAD calibration and confidence report */
+.photo-quality {
+  margin-top: 10px;
+  padding: 10px 11px;
+  border: 1px solid rgba(62, 207, 142, 0.28);
+  border-radius: 8px;
+  background: rgba(62, 207, 142, 0.06);
+  color: var(--muted);
+}
+.photo-quality[hidden] { display: none !important; }
+.photo-quality.quality-warning { border-color: rgba(240, 192, 64, 0.3); background: rgba(240, 192, 64, 0.06); }
+.photo-quality.quality-warning .quality-title { color: var(--warn); }
+.quality-title { color: var(--ok); font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+.photo-quality p, .photo-quality li { font-size: 11px; line-height: 1.45; }
+.photo-quality ul { margin: 6px 0 0 15px; }
+.photo-quality li + li { margin-top: 4px; }
+.studio-dimensions { margin-bottom: 1px; }
+.studio-dimensions .field { min-width: 0; }
+.scale-help { margin: 0 0 9px; }
+.estimate-check { color: var(--warn); font-size: 11.5px; align-items: flex-start; line-height: 1.45; }
+.local-note { border-left: 2px solid var(--warn); padding-left: 8px; margin: 8px 0 10px; }
+
+@media (max-width: 520px) {
+  .studio { padding: 10px; overflow-y: auto; align-items: flex-start; }
+  .studio-card { padding: 14px; margin: auto 0; }
+  .studio-head h2 { font-size: 17px; }
+  .studio-grid { gap: 10px; }
+  .studio-drop { min-height: 145px; }
+  .studio-form textarea { min-height: 86px; }
+}

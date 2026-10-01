@@ -34,17 +34,47 @@
     const g = c.getContext("2d", { willReadFrequently: true });
     g.drawImage(img, 0, 0, w, h);
     const data = g.getImageData(0, 0, w, h).data;
-    let minX = w, minY = h, maxX = 0, maxY = 0;
     const L = new Float32Array(w * h);
+    const border = [[], [], []];
+    const edge = Math.max(2, Math.min(5, Math.floor(Math.min(w, h) * 0.01)));
+    const addBorder = (x, y) => {
+      const i = (y * w + x) * 4;
+      border[0].push(data[i]); border[1].push(data[i + 1]); border[2].push(data[i + 2]);
+    };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (x < edge || x >= w - edge || y < edge || y >= h - edge) addBorder(x, y);
+    }
+    const median = (values) => {
+      const sorted = values.slice().sort((a, b) => a - b);
+      return sorted[Math.floor(sorted.length / 2)] || 0;
+    };
+    const bg = border.map(median);
+    const colCount = new Uint16Array(w), rowCount = new Uint16Array(h);
+    const threshold2 = 42 * 42;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const i = (y * w + x) * 4;
         const v = lum(data[i], data[i + 1], data[i + 2]);
         L[y * w + x] = v;
-        if (v > 18) {
-          if (x < minX) minX = x; if (x > maxX) maxX = x;
-          if (y < minY) minY = y; if (y > maxY) maxY = y;
+        const dr = data[i] - bg[0], dg = data[i + 1] - bg[1], db = data[i + 2] - bg[2];
+        if (dr * dr + dg * dg + db * db > threshold2) {
+          colCount[x]++; rowCount[y]++;
         }
+      }
+    }
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    const minMarks = 2;
+    for (let x = 0; x < w; x++) if (colCount[x] >= minMarks) { minX = x; break; }
+    for (let x = w - 1; x >= 0; x--) if (colCount[x] >= minMarks) { maxX = x; break; }
+    for (let y = 0; y < h; y++) if (rowCount[y] >= minMarks) { minY = y; break; }
+    for (let y = h - 1; y >= 0; y--) if (rowCount[y] >= minMarks) { maxY = y; break; }
+    /* Uniform backgrounds and dark studio photos are both supported. */
+    if (maxX - minX < 12 || maxY - minY < 12) {
+      minX = w; minY = h; maxX = -1; maxY = -1;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        if (L[y * w + x] <= 18) continue;
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
       }
     }
     if (maxX - minX < 12 || maxY - minY < 12) return null;
@@ -128,99 +158,140 @@
     };
   }
 
-  function round1(v) { return Math.round(v * 10) / 10; }
+  function round2(v) { return Math.round(v * 100) / 100; }
+  function validMeasure(value) {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
 
-  function entitiesFromTrace(tr) {
+  function entitiesFromTrace(tr, spec) {
     if (!tr) return null;
-    const leafPxW = tr.inner.r - tr.inner.l;
-    const leafPxH = tr.inner.b - tr.inner.t;
-    let mmPerPx, leafW, leafH, note;
-    if (tr.kind === "door") {
-      leafH = 2100;
-      mmPerPx = leafH / Math.max(1, leafPxH);
-      leafW = round1(leafPxW * mmPerPx);
-      if (Math.abs(leafW - 800) < 40) leafW = 800;
-      else if (Math.abs(leafW - 700) < 40) leafW = 700;
-      else if (Math.abs(leafW - 900) < 40) leafW = 900;
-      else if (Math.abs(leafW - 600) < 40) leafW = 600;
-      mmPerPx = leafW / Math.max(1, leafPxW);
-      leafH = round1(leafPxH * mmPerPx);
-      if (Math.abs(leafH - 2100) < 40) leafH = 2100;
-      note = `Porta interna: anta ${leafW}×${leafH} mm (da foto, altezza UNI 2100)`;
+    spec = spec || {};
+    const isDoor = tr.kind === "door";
+    const outerWpx = Math.max(1, tr.outer.w);
+    const outerHpx = Math.max(1, tr.outer.h);
+    const leafL = isDoor ? tr.inner.l : 0;
+    const leafR = isDoor ? tr.inner.r : tr.outer.w;
+    const leafT = isDoor ? tr.inner.t : 0;
+    const leafB = isDoor ? tr.inner.b : tr.outer.h;
+    const leafPxW = Math.max(1, leafR - leafL);
+    const leafPxH = Math.max(1, leafB - leafT);
+    let knownW = validMeasure(spec.w);
+    let knownH = validMeasure(spec.h);
+    const inputW = knownW, inputH = knownH;
+    let scaleX, scaleY, estimated = false;
+    const warnings = [];
+
+    if (knownW && knownH) {
+      scaleX = knownW / leafPxW;
+      scaleY = knownH / leafPxH;
+      const photoRatio = leafPxW / leafPxH;
+      const givenRatio = knownW / knownH;
+      if (Math.abs(givenRatio / photoRatio - 1) > 0.03) {
+        warnings.push("Le due misure inserite non hanno lo stesso rapporto della foto: larghezza e altezza sono state rispettate separatamente.");
+      }
+    } else if (knownW) {
+      scaleX = scaleY = knownW / leafPxW;
+      knownH = leafPxH * scaleY;
+    } else if (knownH) {
+      scaleX = scaleY = knownH / leafPxH;
+      knownW = leafPxW * scaleX;
     } else {
-      const maxPx = Math.max(tr.outer.w, tr.outer.h);
-      mmPerPx = 100 / maxPx;
-      leafW = round1(leafPxW * mmPerPx);
-      leafH = round1(leafPxH * mmPerPx);
-      note = `Profilo da foto, scala automatica (max 100 mm). Scala se le misure sono diverse.`;
+      estimated = true;
+      if (isDoor) {
+        scaleX = scaleY = 2100 / leafPxH;
+        knownH = 2100;
+        knownW = leafPxW * scaleX;
+        warnings.push("Scala indicativa: per la porta è stata usata un'altezza convenzionale di 2100 mm. Verifica una misura reale prima dell'esportazione.");
+      } else {
+        scaleX = scaleY = 100 / Math.max(outerWpx, outerHpx);
+        knownW = leafPxW * scaleX;
+        knownH = leafPxH * scaleY;
+        warnings.push("Scala indicativa: l'oggetto è stato dimensionato a 100 mm sul lato maggiore. Imposta una misura reale prima di usare il file per produzione.");
+      }
+    }
+    if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || scaleX <= 0 || scaleY <= 0) {
+      throw new Error("Misure non valide: larghezza e altezza devono essere numeri positivi in millimetri.");
     }
 
-    const left = round1(tr.inner.l * mmPerPx);
-    const right = round1((tr.outer.w - tr.inner.r) * mmPerPx);
-    const top = round1(tr.inner.t * mmPerPx);
-    const bottom = round1((tr.outer.h - tr.inner.b) * mmPerPx);
-    const OW = round1(left + leafW + right);
-    const OH = round1(bottom + leafH + top);
-
+    const left = round2(leafL * scaleX);
+    const bottom = round2((outerHpx - leafB) * scaleY);
+    const leafW = inputW ? inputW : round2(leafPxW * scaleX);
+    const leafH = inputH ? inputH : round2(leafPxH * scaleY);
+    const OW = round2(outerWpx * scaleX);
+    const OH = round2(outerHpx * scaleY);
     const E = [];
     const L0 = "0", FOTO = "foto", FER = "ferramenta", Q = "quote";
-    E.push({
-      type: "image",
-      x: 0, y: 0, w: OW, h: OH,
-      opacity: 0.38,
-      layer: FOTO,
-      lockedHit: true
-    });
-    E.push({
-      type: "polyline", closed: true, layer: L0,
-      points: [{ x: 0, y: 0 }, { x: OW, y: 0 }, { x: OW, y: OH }, { x: 0, y: OH }]
-    });
-    E.push({
-      type: "rect", x: left, y: bottom, w: leafW, h: leafH, rot: 0, layer: L0
-    });
+    E.push({ type: "image", x: 0, y: 0, w: OW, h: OH, opacity: 0.38, layer: FOTO, lockedHit: true });
+    E.push({ type: "polyline", closed: true, layer: L0,
+      points: [{ x: 0, y: 0 }, { x: OW, y: 0 }, { x: OW, y: OH }, { x: 0, y: OH }] });
+    if (isDoor) E.push({ type: "rect", x: left, y: bottom, w: leafW, h: leafH, rot: 0, layer: L0 });
 
     const toCad = (px, py) => ({
-      x: round1((px - tr.px.minX) * mmPerPx),
-      y: round1((tr.px.maxY - py) * mmPerPx)
+      x: round2((px - tr.px.minX) * scaleX),
+      y: round2((tr.px.maxY - py) * scaleY)
     });
-
-    if (tr.kind === "door" && tr.hardware.length) {
+    let handleCenter = null;
+    if (isDoor && tr.hardware && tr.hardware.length) {
       const hs = tr.hardware.slice().sort((a, b) => a.y - b.y);
       const handle = hs[0];
       const lock = hs.length > 1 ? hs[1] : null;
-      const hc = toCad(handle.x, handle.y);
-      E.push({ type: "circle", cx: hc.x, cy: hc.y, r: 18, layer: FER });
-      const leverW = Math.max(90, round1(handle.w * mmPerPx));
-      const leverH = Math.max(16, round1(handle.h * mmPerPx));
-      const dir = hc.x < left + leafW / 2 ? 1 : -1;
-      const lx = dir > 0 ? hc.x : hc.x - leverW;
-      E.push({ type: "rect", x: lx, y: hc.y - leverH / 2, w: leverW, h: leverH, rot: 0, layer: FER });
+      handleCenter = toCad(handle.x, handle.y);
+      E.push({ type: "circle", cx: handleCenter.x, cy: handleCenter.y, r: 18, layer: FER, role: "door-hardware" });
+      const leverW = Math.max(80, Math.min(180, round2(handle.w * scaleX)));
+      const leverH = Math.max(10, Math.min(28, round2(handle.h * scaleY)));
+      const dir = handleCenter.x < left + leafW / 2 ? 1 : -1;
+      const lx = dir > 0 ? handleCenter.x : handleCenter.x - leverW;
+      E.push({ type: "rect", x: lx, y: handleCenter.y - leverH / 2, w: leverW, h: leverH, rot: 0, layer: FER, role: "door-hardware" });
       if (lock) {
         const lc = toCad(lock.x, lock.y);
-        E.push({ type: "rect", x: lc.x - 13, y: lc.y - 16, w: 26, h: 32, rot: 0, layer: FER });
-        E.push({ type: "circle", cx: lc.x, cy: lc.y, r: 6, layer: FER });
+        E.push({ type: "rect", x: lc.x - 13, y: lc.y - 16, w: 26, h: 32, rot: 0, layer: FER, role: "door-hardware" });
+        E.push({ type: "circle", cx: lc.x, cy: lc.y, r: 6, layer: FER, role: "door-hardware" });
       }
-      const hingeX = hc.x < left + leafW / 2 ? left + leafW - 4 : left - 16;
+      const hingeX = handleCenter.x < left + leafW / 2 ? left + leafW - 4 : left - 16;
       [0.12, 0.5, 0.88].forEach((t) => {
         const y = bottom + leafH * t;
-        E.push({ type: "rect", x: hingeX, y: y - 15, w: 20, h: 30, rot: 0, layer: FER });
+        E.push({ type: "rect", x: hingeX, y: y - 15, w: 20, h: 30, rot: 0, layer: FER, role: "hinge" });
       });
-      E.push({ type: "dimension", x1: left, y1: bottom, x2: left, y2: hc.y, offset: -28, layer: Q });
-    } else {
+      E.push({ type: "dimension", x1: left, y1: bottom, x2: left, y2: handleCenter.y, offset: -28, layer: Q, role: "handle-dim" });
+    } else if (tr.hardware) {
       tr.hardware.slice(0, 4).forEach((hw) => {
         const p = toCad(hw.x, hw.y);
-        E.push({ type: "circle", cx: p.x, cy: p.y, r: Math.max(4, round1(Math.max(hw.w, hw.h) * mmPerPx / 2)), layer: FER });
+        E.push({ type: "circle", cx: p.x, cy: p.y, r: Math.max(2, round2(Math.max(hw.w * scaleX, hw.h * scaleY) / 2)), layer: FER });
       });
     }
 
     E.push({ type: "dimension", x1: 0, y1: 0, x2: OW, y2: 0, offset: -40, layer: Q });
     E.push({ type: "dimension", x1: 0, y1: 0, x2: 0, y2: OH, offset: -40, layer: Q });
-    E.push({ type: "dimension", x1: left, y1: bottom, x2: left + leafW, y2: bottom, offset: 24, layer: Q });
-    E.push({ type: "dimension", x1: left + leafW, y1: bottom, x2: left + leafW, y2: bottom + leafH, offset: 24, layer: Q });
-    E.push({
-      type: "text", x: OW / 2 - 40, y: OH + 18, text: note, height: 14, rot: 0, layer: Q
-    });
-    return { entities: E, width: OW, height: OH, leafW, leafH, note, kind: tr.kind };
+    if (isDoor) {
+      E.push({ type: "dimension", x1: left, y1: bottom, x2: left + leafW, y2: bottom, offset: 24, layer: Q });
+      E.push({ type: "dimension", x1: left + leafW, y1: bottom, x2: left + leafW, y2: bottom + leafH, offset: 24, layer: Q });
+    }
+
+    const calibration = estimated ? "scala indicativa" : (validMeasure(spec.w) && validMeasure(spec.h) ? "due quote inserite" : "una quota inserita; proporzioni dalla foto");
+    const featureName = isDoor ? "anta" : "ingombro";
+    const note = `${isDoor ? "Porta" : "Oggetto"}: ${featureName} ${round2(validMeasure(spec.w) || leafW)}×${round2(validMeasure(spec.h) || leafH)} mm · ${calibration}`;
+    E.push({ type: "text", x: Math.max(0, OW / 2 - 90), y: OH + 18, text: note, height: 14, rot: 0, layer: Q });
+    warnings.push("Da una sola immagine non si ricavano profondità, prospettiva o parti nascoste: controlla il disegno prima dell'uso tecnico.");
+    if (isDoor && (!tr.hardware || tr.hardware.length < 2)) {
+      warnings.push("Ferramenta non rilevata con sufficiente confidenza; verifica maniglia e serratura.");
+    }
+
+    return {
+      entities: E, width: OW, height: OH, leafW, leafH, note, kind: tr.kind,
+      thickness: validMeasure(spec.thickness) || (isDoor ? 40 : 5), warnings,
+      quality: {
+        estimated,
+        feature: featureName,
+        inputWidth: validMeasure(spec.w),
+        inputHeight: validMeasure(spec.h),
+        featureWidth: leafW,
+        featureHeight: leafH,
+        overallWidth: OW,
+        overallHeight: OH,
+        scaleX, scaleY
+      }
+    };
   }
 
   /** Porta interna misurata dalla foto ComprePorte (anta 800×2100). */
@@ -241,44 +312,62 @@
       points: [{ x: 0, y: 0 }, { x: OW, y: 0 }, { x: OW, y: OH }, { x: 0, y: OH }]
     });
     E.push({ type: "rect", x: left, y: bottom, w: leafW, h: leafH, rot: 0, layer: L0 });
-    E.push({ type: "circle", cx: hx, cy: hy, r: 18, layer: FER });
-    E.push({ type: "rect", x: hx, y: hy - 10, w: 128, h: 20, rot: 0, layer: FER });
-    E.push({ type: "rect", x: lx - 13, y: ly - 16, w: 26, h: 32, rot: 0, layer: FER });
-    E.push({ type: "circle", cx: lx, cy: ly, r: 6, layer: FER });
+    E.push({ type: "circle", cx: hx, cy: hy, r: 18, layer: FER, role: "door-hardware" });
+    E.push({ type: "rect", x: hx, y: hy - 10, w: 128, h: 20, rot: 0, layer: FER, role: "door-hardware" });
+    E.push({ type: "rect", x: lx - 13, y: ly - 16, w: 26, h: 32, rot: 0, layer: FER, role: "door-hardware" });
+    E.push({ type: "circle", cx: lx, cy: ly, r: 6, layer: FER, role: "door-hardware" });
     [250, 1050, 1850].forEach((yy) => {
-      E.push({ type: "rect", x: left + leafW - 4, y: bottom + yy - 15, w: 20, h: 30, rot: 0, layer: FER });
+      E.push({ type: "rect", x: left + leafW - 4, y: bottom + yy - 15, w: 20, h: 30, rot: 0, layer: FER, role: "hinge" });
     });
     E.push({ type: "dimension", x1: 0, y1: 0, x2: OW, y2: 0, offset: -50, layer: Q });
     E.push({ type: "dimension", x1: 0, y1: 0, x2: 0, y2: OH, offset: -50, layer: Q });
     E.push({ type: "dimension", x1: left, y1: bottom, x2: left + leafW, y2: bottom, offset: 30, layer: Q });
     E.push({ type: "dimension", x1: left + leafW, y1: bottom, x2: left + leafW, y2: bottom + leafH, offset: 30, layer: Q });
-    E.push({ type: "dimension", x1: left, y1: bottom, x2: left, y2: hy, offset: -30, layer: Q });
+    E.push({ type: "dimension", x1: left, y1: bottom, x2: left, y2: hy, offset: -30, layer: Q, role: "handle-dim" });
     E.push({ type: "text", x: 20, y: OH + 22, text: "Porta interna a battente · anta 800×2100 · maniglia H 1019 · backset 47", height: 16, rot: 0, layer: Q });
     return { entities: E, width: OW, height: OH, name: "porta-interna" };
   }
 
   function parsePrompt(text) {
     const raw = String(text || "");
-    const t = raw.toLowerCase().replace(/,/g, ".");
+    const t = raw.toLowerCase().replace(/\u00a0/g, " ");
     const spec = { raw };
-    let m = t.match(/(\d+(?:\.\d+)?)\s*[x×\*]\s*(\d+(?:\.\d+)?)/);
-    if (m) { spec.w = parseFloat(m[1]); spec.h = parseFloat(m[2]); }
-    m = t.match(/spess(?:ore)?\s*[:=]?\s*(\d+(?:\.\d+)?)|\bsp\.?\s*(\d+(?:\.\d+)?)|thick(?:ness)?\s*[:=]?\s*(\d+(?:\.\d+)?)/);
-    if (m) spec.thickness = parseFloat(m[1] || m[2] || m[3]);
-    m = t.match(/[ø⌀]\s*(\d+(?:\.\d+)?)|diam(?:etro)?\s*(\d+(?:\.\d+)?)/i);
-    if (m) spec.hole = parseFloat(m[1] || m[2]);
-    m = t.match(/(\d+)\s*for[oi]/);
-    if (m) spec.holeN = parseInt(m[1], 10);
-    m = t.match(/\br\s*[=:]?\s*(\d+(?:\.\d+)?)|raccord\w*\s*(\d+(?:\.\d+)?)/);
-    if (m) spec.radius = parseFloat(m[1] || m[2]);
-    m = t.match(/manigl\w*\s*(?:a\s*|h\s*|ad\s*)?(\d+(?:\.\d+)?)/);
-    if (m) spec.handleH = parseFloat(m[1]);
-    if (/porta|door|anta|battente/.test(t)) spec.kind = "door";
-    if (/piastr|plate|flangia|staffa|gasket|guarniz/.test(t)) spec.kind = spec.kind || "rect";
-    if (/schizzo a mano|sketch|disegno tecnico|blueprint|napkin/.test(t)) spec.kind = spec.kind || "sketch";
-    if (spec.kind === "door" && spec.w && spec.w <= 120 && spec.h && spec.h <= 300) {
-      spec.w *= 10; spec.h *= 10;
+    const number = "(\\d+(?:[.,]\\d+)?)";
+    const unit = "(mm|millimetri?|cm|centimetri?|m|metri?|inch(?:es)?|in|pollici?)";
+    const toMm = (value, u) => {
+      const n = parseFloat(String(value).replace(",", "."));
+      if (!Number.isFinite(n)) return null;
+      const v = String(u || "mm").toLowerCase();
+      if (/^(cm|centimetri?)$/.test(v)) return n * 10;
+      if (/^(m|metri?)$/.test(v)) return n * 1000;
+      if (/^(in|inch(?:es)?|pollici?)$/.test(v)) return n * 25.4;
+      return n;
+    };
+    let m = t.match(new RegExp(`${number}\\s*${unit}?\\s*[x×*]\\s*${number}\\s*${unit}?`, "i"));
+    if (m) {
+      const shared = m[4] || m[2] || "mm";
+      spec.w = toMm(m[1], m[2] || shared);
+      spec.h = toMm(m[3], m[4] || shared);
     }
+    const readNamed = (pattern) => {
+      const hit = t.match(pattern);
+      return hit ? toMm(hit[1], hit[2]) : null;
+    };
+    if (!spec.w) spec.w = readNamed(new RegExp(`(?:larghezza|width)\\s*[:=]?\\s*${number}\\s*${unit}?`, "i"));
+    if (!spec.h) spec.h = readNamed(new RegExp(`(?:altezza|height)\\s*[:=]?\\s*${number}\\s*${unit}?`, "i"));
+    m = t.match(new RegExp(`(?:spess(?:ore)?|\\bsp\\.?|thick(?:ness)?)\\s*[:=]?\\s*${number}\\s*${unit}?`, "i"));
+    if (m) spec.thickness = toMm(m[1], m[2]);
+    m = t.match(new RegExp(`[ø⌀]\\s*${number}\\s*${unit}?|diam(?:etro)?\\s*${number}\\s*${unit}?`, "i"));
+    if (m) spec.hole = toMm(m[1] || m[3], m[2] || m[4]);
+    m = t.match(/(\d+)\s*for[oi]/i);
+    if (m) spec.holeN = parseInt(m[1], 10);
+    m = t.match(/\br\s*[=:]?\s*(\d+(?:[.,]\d+)?)|raccord\w*\s*(\d+(?:[.,]\d+)?)/i);
+    if (m) spec.radius = parseFloat(String(m[1] || m[2]).replace(",", "."));
+    m = t.match(new RegExp(`manigl\\w*\\s*(?:a\\s*|h\\s*|ad\\s*)?${number}\\s*${unit}?`, "i"));
+    if (m) spec.handleH = toMm(m[1], m[2]);
+    if (/porta|door|anta|battente/i.test(t)) spec.kind = "door";
+    else if (/piastr|plate|flangia|staffa|gasket|guarniz/i.test(t)) spec.kind = "rect";
+    if (/schizzo a mano|sketch|disegno tecnico|blueprint|napkin/i.test(t)) spec.kind = spec.kind || "sketch";
     return spec;
   }
 
@@ -363,14 +452,19 @@
     }
     contours.sort((a, b) => b.length - a.length);
     const keep = contours.slice(0, 12);
-    const targetH = (spec && spec.h) || 100;
-    const mm = targetH / h;
+    const knownW = validMeasure(spec && spec.w);
+    const knownH = validMeasure(spec && spec.h);
+    let sx, sy;
+    if (knownW && knownH) { sx = knownW / w; sy = knownH / h; }
+    else if (knownW) { sx = sy = knownW / w; }
+    else if (knownH) { sx = sy = knownH / h; }
+    else { sx = sy = 100 / Math.max(w, h); }
     const E = [];
     keep.forEach((cnt) => {
       const simp = rdp(cnt, 1.8);
       if (simp.length < 3) return;
-      const pts = simp.map((p) => ({ x: round1(p.x * mm), y: round1((h - p.y) * mm) }));
-      const closed = Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 2 * mm;
+      const pts = simp.map((p) => ({ x: round2(p.x * sx), y: round2((h - p.y) * sy) }));
+      const closed = Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 2 * Math.max(sx, sy);
       if (closed && pts.length > 2) pts.pop();
       const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
       const rw = Math.max(...xs) - Math.min(...xs), rh = Math.max(...ys) - Math.min(...ys);
@@ -378,89 +472,156 @@
       const rs = pts.map((p) => Math.hypot(p.x - cx, p.y - cy));
       const rAvg = rs.reduce((a, b) => a + b, 0) / rs.length;
       const rDev = Math.sqrt(rs.reduce((a, b) => a + (b - rAvg) * (b - rAvg), 0) / rs.length) / (rAvg || 1);
-      if (closed && rDev < 0.12 && rAvg > 2) {
-        E.push({ type: "circle", cx: round1(cx), cy: round1(cy), r: round1(rAvg), layer: "0" });
+      const uniformScale = Math.abs(sx - sy) / Math.max(sx, sy) < 0.005;
+      if (closed && rDev < 0.12 && rAvg > 2 && uniformScale) {
+        E.push({ type: "circle", cx: round2(cx), cy: round2(cy), r: round2(rAvg), layer: "0" });
       } else {
         E.push({ type: "polyline", points: pts, closed: closed && pts.length >= 3, layer: "0" });
       }
     });
-    const note = `Vettorializzato dallo schizzo (${E.length} profili), scala H=${round1(h * mm)} mm`;
+    const width = round2(w * sx), height = round2(h * sy);
+    const note = `Vettorializzato dallo schizzo (${E.length} profili) · ${width}×${height} mm`;
     E.push({ type: "text", x: 0, y: -12, text: note, height: 4, rot: 0, layer: "quote" });
+    const warnings = [];
+    if (!knownW && !knownH) warnings.push("Scala indicativa: il lato maggiore è stato impostato a 100 mm. Inserisci una misura reale prima dell'uso tecnico.");
+    else if (!(knownW && knownH)) warnings.push("Una sola quota è stata inserita; le altre proporzioni dipendono dalla foto.");
+    else if (Math.abs((knownW / knownH) / (w / h) - 1) > 0.03) warnings.push("Le quote inserite non hanno lo stesso rapporto della foto; il disegno è stato adattato ai due valori.");
+    warnings.push("Verifica i contorni vettorializzati: sfondo, ombre e tratti sovrapposti possono creare segmenti non desiderati.");
     return {
-      entities: E, kind: "sketch", note,
-      thickness: (spec && spec.thickness) || 5,
-      width: w * mm, height: h * mm
+      entities: E, kind: "sketch", note, warnings,
+      thickness: validMeasure(spec && spec.thickness) || 5,
+      width, height,
+      quality: { estimated: !knownW && !knownH, inputWidth: knownW, inputHeight: knownH, overallWidth: width, overallHeight: height, scaleX: sx, scaleY: sy }
     };
   }
 
   function applySpec(built, spec) {
     if (!built || !spec) return built;
-    if (spec.thickness) built.thickness = spec.thickness;
+    const thickness = validMeasure(spec.thickness);
+    if (thickness) built.thickness = thickness;
     const ents = built.entities || [];
-    const leaf = ents.find((e) => e.type === "rect" && e.layer === "0" && (e.h || 0) >= (e.w || 0));
-    if (leaf && spec.w && spec.h) {
-      const fx = spec.w / (leaf.w || spec.w), fy = spec.h / (leaf.h || spec.h);
-      const ox = leaf.x, oy = leaf.y;
+    let leaf = ents.find((e) => e.type === "rect" && e.layer === "0" && (e.h || 0) >= (e.w || 0));
+    const targetW = validMeasure(spec.w), targetH = validMeasure(spec.h);
+    const fallbackProfile = !leaf && ents.find((e) => (e.type === "polyline" || e.type === "polygon") && e.closed && e.layer === "0" && e.points && e.points.length >= 3);
+    let refX = leaf ? leaf.x : 0, refY = leaf ? leaf.y : 0;
+    let refW = leaf ? leaf.w : 0, refH = leaf ? leaf.h : 0;
+    if (fallbackProfile) {
+      const xs = fallbackProfile.points.map((p) => p.x), ys = fallbackProfile.points.map((p) => p.y);
+      refX = Math.min(...xs); refY = Math.min(...ys);
+      refW = Math.max(...xs) - refX; refH = Math.max(...ys) - refY;
+    }
+    if ((leaf || fallbackProfile) && (targetW || targetH)) {
+      const fx = targetW ? targetW / Math.max(refW, 1e-9) : targetH / Math.max(refH, 1e-9);
+      const fy = targetH ? targetH / Math.max(refH, 1e-9) : fx;
+      const anchor = { x: refX, y: refY };
+      const map = (p) => ({ x: anchor.x + (p.x - anchor.x) * fx, y: anchor.y + (p.y - anchor.y) * fy });
       ents.forEach((e) => {
-        const scp = (p) => ({ x: ox + (p.x - ox) * fx, y: oy + (p.y - oy) * fy });
         if (e.type === "rect" || e.type === "image") {
-          const c = scp({ x: e.x + e.w / 2, y: e.y + e.h / 2 });
-          e.w *= fx; e.h *= fy; e.x = c.x - e.w / 2; e.y = c.y - e.h / 2;
+          const p0 = map({ x: e.x, y: e.y });
+          const p1 = map({ x: e.x + e.w, y: e.y + e.h });
+          e.x = p0.x; e.y = p0.y; e.w = p1.x - p0.x; e.h = p1.y - p0.y;
         } else if (e.type === "circle") {
-          const c = scp({ x: e.cx, y: e.cy }); e.cx = c.x; e.cy = c.y; e.r *= (fx + fy) / 2;
-        } else if (e.points) e.points = e.points.map(scp);
-        else if (e.type === "dimension" || e.type === "line") {
-          const a = scp({ x: e.x1, y: e.y1 }), b = scp({ x: e.x2, y: e.y2 });
-          e.x1 = a.x; e.y1 = a.y; e.x2 = b.x; e.y2 = b.y;
+          const c = map({ x: e.cx, y: e.cy });
+          e.cx = c.x; e.cy = c.y;
+          if (Math.abs(fx - fy) < 1e-9) e.r *= fx;
+          else { e.type = "ellipse"; e.rx = e.r * fx; e.ry = e.r * fy; e.rot = 0; delete e.r; }
+        } else if (e.type === "ellipse") {
+          const c = map({ x: e.cx, y: e.cy });
+          e.cx = c.x; e.cy = c.y; e.rx *= fx; e.ry *= fy;
+        } else if (e.type === "polyline" || e.type === "polygon" || e.type === "spline") {
+          e.points = (e.points || []).map(map);
+        } else if (e.type === "line" || e.type === "dimension") {
+          const dx = e.x2 - e.x1, dy = e.y2 - e.y1;
+          const p0 = map({ x: e.x1, y: e.y1 }), p1 = map({ x: e.x2, y: e.y2 });
+          e.x1 = p0.x; e.y1 = p0.y; e.x2 = p1.x; e.y2 = p1.y;
+          if (e.type === "dimension") {
+            const len = Math.hypot(dx, dy) || 1;
+            e.offset = (e.offset || 0) * Math.hypot((-dy / len) * fx, (dx / len) * fy);
+          }
         } else if (e.type === "text") {
-          const p = scp({ x: e.x, y: e.y }); e.x = p.x; e.y = p.y;
+          const p = map({ x: e.x, y: e.y });
+          e.x = p.x; e.y = p.y; e.height = (e.height || 4) * Math.sqrt(fx * fy);
         }
       });
-      built.leafW = spec.w; built.leafH = spec.h;
+      built.leafW = targetW || round2(refW * fx);
+      built.leafH = targetH || round2(refH * fy);
+      if (!leaf) {
+        built.width = targetW || round2((built.width || refW) * fx);
+        built.height = targetH || round2((built.height || refH) * fy);
+      }
     }
-    if (leaf && spec.handleH) {
-      const target = leaf.y + spec.handleH;
-      const hs = ents.filter((e) => e.layer === "ferramenta" && e.type === "circle");
-      if (hs.length) {
-        const hy = Math.max(...hs.map((e) => e.cy));
-        const dy = target - hy;
+
+    leaf = ents.find((e) => e.type === "rect" && e.layer === "0" && (e.h || 0) >= (e.w || 0));
+    const handleHeight = validMeasure(spec.handleH);
+    if (leaf && handleHeight) {
+      const handles = ents.filter((e) => e.layer === "ferramenta" && e.type === "circle" && e.role === "door-hardware");
+      const fallback = handles.length ? handles : ents.filter((e) => e.layer === "ferramenta" && e.type === "circle");
+      const primary = fallback.sort((a, b) => b.cy - a.cy)[0];
+      if (primary) {
+        const oldY = primary.cy;
+        const dy = leaf.y + handleHeight - oldY;
         ents.forEach((e) => {
-          if (e.layer !== "ferramenta" && !(e.type === "dimension" && Math.abs((e.y2 || 0) - hy) < 8)) return;
-          if (e.cx != null) e.cy += dy;
-          if (e.y != null && e.type === "rect") e.y += dy;
-          if (e.y1 != null) { e.y1 += dy; e.y2 += dy; }
+          const isHardware = e.role === "door-hardware" || (!e.role && e.layer === "ferramenta" && e.type !== "rect");
+          if (isHardware) {
+            if (e.cy != null) e.cy += dy;
+            if (e.y != null) e.y += dy;
+            if (e.y1 != null) { e.y1 += dy; e.y2 += dy; }
+          }
+          if (e.type === "dimension" && (e.role === "handle-dim" || (Math.abs((e.y2 || 0) - oldY) < 8 && Math.abs(e.x1 - leaf.x) < 2))) e.y2 += dy;
         });
       }
     }
     if (spec.raw) {
       const txt = ents.find((e) => e.type === "text");
-      if (txt) txt.text = (built.note || "") + " · " + spec.raw;
+      if (txt) txt.text = `${built.note || ""} · ${String(spec.raw).slice(0, 100)}`;
     }
     return built;
   }
 
-  function generateFromImage(img, promptText) {
-    const spec = parsePrompt(promptText);
-    const meanCanvas = document.createElement("canvas");
-    const mw = 64, mh = 64;
-    meanCanvas.width = mw; meanCanvas.height = mh;
-    const mg = meanCanvas.getContext("2d");
-    mg.drawImage(img, 0, 0, mw, mh);
-    const d = mg.getImageData(0, 0, mw, mh).data;
-    let mean = 0, edge = 0;
-    for (let i = 0; i < d.length; i += 4) mean += lum(d[i], d[i + 1], d[i + 2]);
-    mean /= (d.length / 4);
-    const sketchy = spec.kind === "sketch" || (mean > 150 && spec.kind !== "door");
-    if (sketchy && spec.kind !== "door") {
-      return applySpec(vectorizeSketch(img, spec), spec);
+  function validateGenerated(built) {
+    if (!built || !Array.isArray(built.entities)) throw new Error("Non è stato possibile generare un disegno dalla foto.");
+    const numericKeys = ["x", "y", "w", "h", "cx", "cy", "r", "rx", "ry", "x1", "y1", "x2", "y2", "offset", "height"];
+    for (const e of built.entities) {
+      for (const k of numericKeys) if (e[k] != null && !Number.isFinite(e[k])) throw new Error("Il disegno contiene una coordinata non valida; nessun file è stato creato.");
+      if (e.points && e.points.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.y))) throw new Error("Il contorno contiene coordinate non valide.");
+      if (e.type === "rect" && (e.w <= 0 || e.h <= 0)) throw new Error("È stato rilevato un rettangolo con misure nulle.");
     }
-    const tr = tracePhoto(img);
-    if (!tr) return applySpec(vectorizeSketch(img, spec), spec);
-    if (spec.kind && spec.kind !== "sketch") tr.kind = spec.kind;
-    const built = entitiesFromTrace(tr);
-    if (!built) return applySpec(vectorizeSketch(img, spec), spec);
-    built.thickness = spec.thickness || (built.kind === "door" ? 40 : 5);
-    return applySpec(built, spec);
+    const hasGeometry = built.entities.some((e) => ["line", "rect", "circle", "ellipse", "polyline", "polygon", "spline"].includes(e.type));
+    if (!hasGeometry) throw new Error("Nessun contorno riconoscibile. Prova con una foto più nitida o un disegno tecnico frontale.");
+    const hasClosedProfile = built.entities.some((e) => e.type === "rect" || e.type === "circle" || e.type === "ellipse" || ((e.type === "polyline" || e.type === "polygon") && e.closed));
+    if (!hasClosedProfile) built.warnings = (built.warnings || []).concat("Nessun profilo chiuso rilevato: Onshape importerà lo schizzo, ma non potrà estrudere i tratti aperti.");
+    return built;
+  }
+
+  function generateFromImage(img, promptText, options) {
+    const spec = parsePrompt(promptText);
+    options = options || {};
+    const w = validMeasure(options.width != null ? options.width : options.w);
+    const h = validMeasure(options.height != null ? options.height : options.h);
+    if (w) spec.w = w;
+    if (h) spec.h = h;
+    if (["door", "rect", "sketch"].includes(options.kind)) spec.kind = options.kind;
+    const thickness = validMeasure(options.thickness);
+    if (thickness) spec.thickness = thickness;
+    const allowEstimate = !!options.allowEstimate;
+    if (!validMeasure(spec.w) && !validMeasure(spec.h) && !allowEstimate) {
+      throw new Error("Per mantenere la scala corretta, inserisci almeno una misura reale in millimetri. Una sola quota mantiene le proporzioni della foto.");
+    }
+
+    let built;
+    if (spec.kind === "sketch") {
+      built = vectorizeSketch(img, spec);
+    } else {
+      const tr = tracePhoto(img);
+      if (!tr) throw new Error("Non riesco a trovare un contorno nell'immagine. Usa una foto frontale, ben illuminata, con il pezzo separato dallo sfondo.");
+      if (spec.kind && spec.kind !== "sketch") tr.kind = spec.kind;
+      built = entitiesFromTrace(tr, spec);
+    }
+    if (!built) throw new Error("Nessun disegno generato dall'immagine.");
+    if (spec.handleH) applySpec(built, { handleH: spec.handleH });
+    built.thickness = thickness || built.thickness || (built.kind === "door" ? 40 : 5);
+    built = validateGenerated(built);
+    return built;
   }
 
   global.SchizzoTrace = {

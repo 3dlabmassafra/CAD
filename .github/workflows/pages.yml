@@ -2,7 +2,9 @@ name: Pubblica la webapp su GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - arena/01a0f628-cad
   workflow_dispatch:
 
 permissions:
@@ -15,21 +17,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: .            # sito statico: HTML/CSS/JS alla radice
-
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - id: deployment
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4

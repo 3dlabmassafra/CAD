@@ -92,6 +92,13 @@ node dev/test-precision.js    # analisi: linee, simmetria, ferramenta
 node dev/test-models.js       # stima parametri dalla foto
 node dev/e2e.js               # foto → tavola → DXF → STL → brief con verifiche
 node dev/test-studio.js       # la stessa pipeline dentro studio.js, con DOM simulato
+node --test tests/trace.test.js # calibrazione ed export del CAD rapido
 ```
 
 Legge la foto via `dev/porta.ppm` (`convert porta.jpg -depth 8 porta.ppm`).
+
+### Limiti di misura
+
+Una singola vista non contiene informazioni sufficienti per ricostruire la profondità o correggere una prospettiva sconosciuta. Le quote dichiarate dall’utente sono vincoli; i dettagli dedotti dalla foto restano stime da verificare prima di fabbricare. L’immagine viene elaborata localmente nel browser.
+
+Il workflow GitHub Pages pubblica il sito quando viene aggiornato `main` o il branch Arena della sessione.
