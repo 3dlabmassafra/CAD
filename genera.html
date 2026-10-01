@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Foto → Disegno tecnico — 3D Lab Massafra</title>
+  <meta name="description" content="Da una foto al disegno tecnico quotato in millimetri: misure proporzionate, controlli automatici, DXF per Onshape e per Ragnar." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23f5a623'/%3E%3Cpath d='M4 11.5V4.5h8M4 8h5' stroke='%231a1204' stroke-width='1.6' fill='none'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="studio.css" />
+</head>
+<body class="app">
+  <header class="topbar-app">
+    <div class="wrap row">
+      <a class="brand-app" href="index.html" style="text-decoration:none;color:inherit">
+        <span class="logo" aria-hidden="true">
+          <svg width="17" height="17" viewBox="0 0 16 16" fill="none">
+            <path d="M4 11.5V4.5h8M4 8h5" stroke="#1a1204" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span>
+          <span class="name">3D Lab Massafra</span>
+          <span class="sub">Foto → disegno tecnico</span>
+        </span>
+      </a>
+      <nav class="nav-app">
+        <a href="index.html">Home</a>
+        <a href="genera.html" class="on">Genera</a>
+        <a href="cad.html">CAD 2D</a>
+        <a href="https://github.com/3dlabmassafra/CAD" target="_blank" rel="noopener">Repository</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap wizard">
+    <aside class="steps">
+      <button class="step-item on" data-step="1">
+        <span class="idx">1</span>
+        <span><span class="t">La foto</span><span class="d">Carica la foto del pezzo e, se le conosci, scrivi le misure.</span></span>
+      </button>
+      <button class="step-item" data-step="2">
+        <span class="idx">2</span>
+        <span><span class="t">Le misure</span><span class="d">Contorni, assi di simmetria, ferramenta: ogni numero con la sua verifica.</span></span>
+      </button>
+      <button class="step-item" data-step="3">
+        <span class="idx">3</span>
+        <span><span class="t">Il disegno tecnico</span><span class="d">Tavola quotata in mm, pronta per Onshape, cad 3D e Ragnar.</span></span>
+      </button>
+    </aside>
+
+    <div>
+      <!-- ============================ PASSO 1 ============================ -->
+      <section class="pane on" data-step="1">
+        <div class="panel-app">
+          <h2>Carica la foto del pezzo</h2>
+          <p class="hint">Una foto frontale, dritta e ben illuminata è sufficiente. Se conosci le misure, scrivile: diventano il riferimento e tutto il resto viene ricavato di conseguenza.</p>
+
+          <div class="drop" id="drop">
+            <div>
+              <img id="photo-preview" alt="" hidden />
+              <div id="drop-msg">
+                <div class="big">Trascina qui la foto — oppure clicca</div>
+                <div class="small">JPG, PNG o WEBP · puoi anche incollare con <kbd>Ctrl</kbd>+<kbd>V</kbd><br />Porta, pannello, piastra, sportello, serramento…</div>
+              </div>
+            </div>
+          </div>
+          <input type="file" id="file-photo" accept="image/*" hidden />
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px">
+            <button class="btn sm" id="btn-demo">Usa la foto di esempio (porta)</button>
+            <span style="font-size:12.5px;color:var(--muted)" id="file-meta"></span>
+          </div>
+
+          <div class="group-title" style="margin-top:22px">Misure che conosci già (opzionale, ma alza la precisione)</div>
+          <textarea id="prompt" rows="2" style="width:100%;background:#0e1218;border:1px solid var(--border);border-radius:10px;padding:11px 12px;font-size:13.5px;font-family:var(--font);outline:none;resize:vertical"
+            placeholder="Es.: porta interna anta 800x2100, spessore 40, maniglia a 1019, backset 45"></textarea>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+            <button class="btn sm ghost" data-esempio="porta interna anta 800x2100, spessore 40, maniglia a 1019, backset 45, 3 cerniere, serratura a sinistra">Esempio porta</button>
+            <button class="btn sm ghost" data-esempio="piastra 120x80 spessore 5, 4 fori da 6 a 12 dal bordo">Esempio piastra</button>
+            <button class="btn sm ghost" data-esempio="anta 900x2150, spessore 45">Solo anta</button>
+          </div>
+          <div id="declared" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"></div>
+
+          <ul class="tips" style="margin-top:20px">
+            <li><b>Inquadra il pezzo intero</b>, senza tagliare i bordi: il contorno è la misura principale.</li>
+            <li><b>Metti la fotocamera parallela</b> alla faccia da misurare: così le proporzioni restano reali.</li>
+            <li><b>Evita ombre dure</b> e riflessi sul metallo: meglio luce diffusa.</li>
+          </ul>
+
+          <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn primary" id="btn-analyze">Analizza la foto</button>
+            <a class="btn ghost" href="cad.html">Ho già un disegno: apri il CAD</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ PASSO 2 ============================ -->
+      <section class="pane" data-step="2">
+        <div class="split">
+          <div>
+            <div class="panel-app">
+              <h2>Quello che l'analisi ha trovato</h2>
+              <p class="hint">Nessuna stima "a occhio": le linee sono posizioni sub-pixel, la simmetria è verificata, la ferramenta è misurata dal riquadro reale.</p>
+              <div class="viewer">
+                <canvas id="overlay"></canvas>
+                <div class="legend">
+                  <span><i style="background:#3ecf8e"></i>contorno</span>
+                  <span><i style="background:#4db2ff"></i>assi speculari</span>
+                  <span><i style="background:#8b93a7"></i>spigoli</span>
+                  <span><i style="background:#c084fc"></i>ferramenta</span>
+                </div>
+              </div>
+              <div class="evidence" id="evidence"></div>
+              <div class="checks" id="checks"></div>
+              <div id="warns" hidden></div>
+              <div style="display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap">
+                <span id="checks-summary"></span>
+                <button class="btn sm ghost" id="btn-analyze-2" onclick="document.getElementById('btn-analyze').click()">Rianalizza</button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="panel-app">
+              <h2>Misure del pezzo</h2>
+              <p class="hint">Correggi quello che serve: il disegno si rigenera subito e resta coerente (nessuna quota "orfana").</p>
+              <div class="fields" id="params"></div>
+              <div class="group-title" style="margin-top:18px">Tipo di pezzo</div>
+              <div class="field-app">
+                <label for="model-select">Modello parametrico</label>
+                <select id="model-select">
+                  <option value="door">Porta a battente</option>
+                  <option value="panel">Pannello / piastra</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+          <button class="btn ghost" id="btn-back">← Indietro</button>
+          <button class="btn primary" id="btn-gen">Genera il disegno tecnico →</button>
+        </div>
+      </section>
+
+      <!-- ============================ PASSO 3 ============================ -->
+      <section class="pane" data-step="3">
+        <div class="panel-app">
+          <h2>Disegno tecnico quotato</h2>
+          <p class="hint">Tavola in millimetri con cartiglio, quote reali e note di lavorazione. È il documento da consegnare a Ragnar o da importare in Onshape.</p>
+
+          <div class="sheet-toolbar">
+            <button class="btn sm" data-paper="a4p">A4 verticale</button>
+            <button class="btn sm primary" data-paper="a3p">A3 verticale</button>
+            <button class="btn sm" data-paper="a4l">A4 orizzontale</button>
+            <button class="btn sm" data-paper="a3l">A3 orizzontale</button>
+            <span class="sep"></span>
+            <label style="font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:7px">
+              <input type="checkbox" id="chk-dims" checked /> quote
+            </label>
+            <label style="font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:7px">
+              <input type="checkbox" id="chk-detail" checked /> dettaglio ferramenta
+            </label>
+            <span class="sep"></span>
+            <label style="font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:7px">
+              PNG
+              <select id="png-dpi" style="height:28px;background:#0e1218;border:1px solid var(--border);border-radius:7px;padding:0 6px;font-size:12px">
+                <option value="150">150 dpi</option>
+                <option value="300" selected>300 dpi</option>
+                <option value="600">600 dpi</option>
+              </select>
+            </label>
+            <span class="sep"></span>
+            <button class="btn sm" id="btn-print">Stampa</button>
+          </div>
+
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px" id="sheet-meta"></div>
+          <div class="sheet-wrap" id="sheet"></div>
+
+          <div class="dl-grid">
+            <button class="dl" id="dl-dxf"><b>DXF per Onshape / Ragnar</b><span>Geometria in mm, quote incluse. È il file che il CAD 3D legge meglio.</span></button>
+            <button class="dl" id="dl-stl"><b>STL 3D</b><span>Estensione dei profili chiusi con lo spessore impostato.</span></button>
+            <button class="dl" id="dl-svg"><b>SVG vettoriale</b><span>Tavola tecnica in scala, infinitamente ingrandibile.</span></button>
+            <button class="dl" id="dl-png"><b>PNG quotata</b><span>Per preventivi, e-mail e documentazione di cantiere.</span></button>
+            <button class="dl" id="dl-json"><b>Brief JSON</b><span>Misure, spessore, fori e note: il riassunto da dare a Ragnar.</span></button>
+          </div>
+
+          <div class="note-box" style="margin-top:18px">
+            <b>Come usarlo con Ragnar:</b> carica il <b>PNG/SVG della tavola</b> (disegno tecnico quotato) e allega il <b>brief JSON</b> con le misure in millimetri. Ragnar legge proporzioni e quote coerenti, senza doverle indovinare dalla foto.
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+          <button class="btn ghost" id="btn-back-3" onclick="document.querySelector('.step-item[data-step=2]').click()">← Cambia le misure</button>
+          <a class="btn" href="cad.html">Rifinisci nel CAD 2D</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <div class="wrap row">
+      <span class="status" id="ab-status">Carica una foto per iniziare.</span>
+      <button class="btn sm ghost" id="btn-nuova">Nuova foto</button>
+      <button class="btn primary" id="ab-next">Analizza la foto</button>
+    </div>
+  </div>
+
+  <div class="progress" id="progress" hidden>
+    <div class="card-app">
+      <div class="spinner"></div>
+      <div style="font-size:15px;font-weight:500" id="progress-title">Analisi della foto</div>
+      <div class="step-label" id="progress-step"></div>
+    </div>
+  </div>
+
+  <script src="export.js"></script>
+  <script src="precision.js"></script>
+  <script src="models.js"></script>
+  <script src="sheet.js"></script>
+  <script src="studio.js"></script>
+</body>
+</html>

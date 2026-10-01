@@ -170,6 +170,32 @@
     return out;
   }
 
+  function dimensionPrimitives(e) {
+    const a = { x: e.x1, y: e.y1 }, b = { x: e.x2, y: e.y2 };
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const ux = dx / length, uy = dy / length, nx = -uy, ny = ux;
+    const offset = e.offset || 8;
+    const p1 = { x: a.x + nx * offset, y: a.y + ny * offset };
+    const p2 = { x: b.x + nx * offset, y: b.y + ny * offset };
+    const arrowLength = Math.max(1.5, Math.min(4, length * 0.08));
+    const arrowWidth = arrowLength * 0.45;
+    const arrow = (tip, direction) => [
+      { x: tip.x, y: tip.y },
+      { x: tip.x + ux * arrowLength * direction + nx * arrowWidth, y: tip.y + uy * arrowLength * direction + ny * arrowWidth },
+      { x: tip.x + ux * arrowLength * direction - nx * arrowWidth, y: tip.y + uy * arrowLength * direction - ny * arrowWidth }
+    ];
+    const labelX = (p1.x + p2.x) / 2 + nx * 3.5;
+    const labelY = (p1.y + p2.y) / 2 + ny * 3.5;
+    let textAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (textAngle > 90) textAngle -= 180;
+    if (textAngle < -90) textAngle += 180;
+    return {
+      a, b, p1, p2, length, arrow1: arrow(p1, 1), arrow2: arrow(p2, -1),
+      label: (e.prefix || "") + length.toFixed(2), labelX, labelY, textAngle
+    };
+  }
+
   function entityBlocks(entities, layers, opts, handle) {
     const includeDim = !!(opts && opts.includeDimensions);
     const onlySel = opts && opts.selectionIds ? new Set(opts.selectionIds) : null;
@@ -179,7 +205,7 @@
     for (const e of entities) {
       if (onlySel && !onlySel.has(e.id)) continue;
       if (e.layer && visible.size && !visible.has(e.layer)) continue;
-      if (e.type === "dimension" && !includeDim) continue;
+      if ((e.type === "dimension" || e.type === "text") && !includeDim) continue;
       const layer = layerName(e, layers);
       const aci = aciOf(e, layers);
       switch (e.type) {
@@ -235,19 +261,16 @@
           break;
         case "dimension": {
           if (!includeDim) break;
-          const dx = e.x2 - e.x1, dy = e.y2 - e.y1;
-          const len = Math.hypot(dx, dy) || 1;
-          const nx = -dy / len, ny = dx / len;
-          const off = e.offset || 8;
-          const p1 = { x: e.x1 + nx * off, y: e.y1 + ny * off };
-          const p2 = { x: e.x2 + nx * off, y: e.y2 + ny * off };
-          chunks.push(lwpoly([p1, p2], false, layer, aci, handle));
-          const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
-          const label = (e.prefix || "") + (len).toFixed(2);
+          const d = dimensionPrimitives(e);
+          chunks.push(lwpoly([d.a, d.p1], false, layer, aci, handle));
+          chunks.push(lwpoly([d.b, d.p2], false, layer, aci, handle));
+          chunks.push(lwpoly([d.p1, d.p2], false, layer, aci, handle));
+          chunks.push(lwpoly(d.arrow1, true, layer, aci, handle));
+          chunks.push(lwpoly(d.arrow2, true, layer, aci, handle));
           chunks.push(pairs([
             [0, "TEXT"], [5, handle()], [8, layer], [62, aci],
-            [10, n(mx)], [20, n(my + 1.2)], [30, "0.0"],
-            [40, "2.5"], [1, label], [7, "STANDARD"]
+            [10, n(d.labelX)], [20, n(d.labelY)], [30, "0.0"],
+            [40, "3.5"], [1, d.label + " " + ((opts && opts.units) || "mm")], [50, n(d.textAngle)], [7, "STANDARD"]
           ]));
           break;
         }
@@ -294,7 +317,13 @@
         case "polygon":
         case "spline": addPts(e.points); break;
         case "text": add(e.x, e.y); add(e.x + 20, e.y + (e.height || 3)); break;
-        case "dimension": add(e.x1, e.y1); add(e.x2, e.y2); break;
+        case "dimension": {
+          const d = dimensionPrimitives(e);
+          add(d.a.x, d.a.y); add(d.b.x, d.b.y); add(d.p1.x, d.p1.y); add(d.p2.x, d.p2.y);
+          [...d.arrow1, ...d.arrow2].forEach((p) => add(p.x, p.y));
+          add(d.labelX, d.labelY); add(d.labelX + 4, d.labelY + 3.5);
+          break;
+        }
         case "image": add(e.x, e.y); add(e.x + (e.w || 0), e.y + (e.h || 0)); break;
         default: break;
       }
@@ -377,7 +406,7 @@
     const filtered = entities.filter((e) => {
       if (onlySel && !onlySel.has(e.id)) return false;
       if (e.layer && visible.size && !visible.has(e.layer)) return false;
-      if (e.type === "dimension" && !includeDim) return false;
+      if ((e.type === "dimension" || e.type === "text") && !includeDim) return false;
       return true;
     });
     const bb = bboxOf(filtered.length ? filtered : entities);
@@ -386,6 +415,7 @@
     const w = Math.max(1, bb.maxX - bb.minX + pad * 2);
     const h = Math.max(1, bb.maxY - bb.minY + pad * 2);
     const units = (opts && opts.units) || state.units || "mm";
+    const svgUnit = units === "in" || units === "inch" || units === "inches" ? "in" : units === "cm" ? "cm" : units === "m" ? "m" : "mm";
 
     const colorOf = (e) => {
       if (e.color) return e.color;
@@ -437,9 +467,21 @@
           paths.push(`<${tag} points="${pts.map((p) => `${p.x},${p.y}`).join(" ")}" ${stroke(e)} />`);
           break;
         }
-        case "text":
-          paths.push(`<text x="${e.x}" y="${e.y}" font-size="${e.height || 3}" fill="${colorOf(e)}" font-family="IBM Plex Sans, sans-serif">${svgEsc(e.text || "")}</text>`);
+        case "text": {
+          const rot = -((e.rot || 0) * 180) / Math.PI;
+          paths.push(`<text transform="translate(${e.x} ${e.y}) scale(1,-1) rotate(${rot})" x="0" y="0" font-size="${e.height || 3}" fill="${colorOf(e)}" font-family="IBM Plex Sans, sans-serif">${svgEsc(e.text || "")}</text>`);
           break;
+        }
+        case "dimension": {
+          const d = dimensionPrimitives(e);
+          const style = `stroke="${colorOf(e)}" fill="none" stroke-width="0.2" stroke-linecap="round" stroke-linejoin="round"`;
+          const line = (a, b) => `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" ${style} />`;
+          const poly = (pts) => `<polygon points="${pts.map((p) => `${p.x},${p.y}`).join(" ")}" ${style} />`;
+          paths.push(line(d.a, d.p1), line(d.b, d.p2), line(d.p1, d.p2), poly(d.arrow1), poly(d.arrow2));
+          const angle = -d.textAngle;
+          paths.push(`<text transform="translate(${d.labelX} ${d.labelY}) scale(1,-1) rotate(${angle})" x="0" y="0" text-anchor="middle" font-size="3.5" fill="${colorOf(e)}" font-family="IBM Plex Mono, monospace">${svgEsc(d.label + " " + units)}</text>`);
+          break;
+        }
         default:
           break;
       }
@@ -447,7 +489,7 @@
 
     /* SVG Y is down: flip around X so CAD Y-up matches the file */
     return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${w}${units === "in" ? "in" : "mm"}" height="${h}${units === "in" ? "in" : "mm"}" viewBox="0 0 ${w} ${h}">
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}${svgUnit}" height="${h}${svgUnit}" viewBox="0 0 ${w} ${h}">
   <title>Schizzo</title>
   <g transform="translate(${-minX}, ${h + minY}) scale(1,-1)">
     ${paths.join("\n    ")}
@@ -704,6 +746,7 @@
     bboxOf,
     rectPoints,
     sampleSpline,
+    dimensionPrimitives,
     bulgeToArc,
     sampleBulge,
     polylineDrawPts,
