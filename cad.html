@@ -168,9 +168,9 @@
         <canvas id="c"></canvas>
         <div class="empty" id="empty">
           <div class="empty-card">
-            <h2>Foto o schizzo → CAD</h2>
-            <p>Carica un’immagine, descrivi misure e spessore, ottieni profili chiusi in millimetri. Poi DXF in Onshape o STL.</p>
-            <button class="btn-block accent" id="empty-photo" style="margin-bottom:12px">Carica foto e descrivi il pezzo</button>
+            <h2>Da immagine a disegno tecnico</h2>
+            <p>Genera un prospetto CAD modificabile e quotato. Inserisci almeno una misura reale: la scala non viene indovinata. Esporta DXF, SVG o PNG.</p>
+            <button class="btn-block accent" id="empty-photo" style="margin-bottom:12px">Carica immagine e imposta le misure</button>
             <div class="empty-grid">
               <button class="tpl" data-tpl="door"><b>Porta da foto</b><span>Anta 800×2100, maniglia, telaio</span></button>
               <button class="tpl" data-tpl="plate"><b>Piastra forata</b><span>80×50 mm, 4 fori Ø6</span></button>
@@ -258,7 +258,8 @@
           <div class="h">Onshape</div>
           <p class="help-list" style="margin-bottom:10px">Esporta in <b style="color:var(--text)">DXF millimetri</b>, poi in Onshape: <em>Inserisci → Importa</em> nel Part Studio, oppure importa lo schizzo su un piano e usa <em>Estrudi</em>.</p>
           <label class="check"><input type="checkbox" id="ex-sel" /> Solo selezione</label>
-          <label class="check"><input type="checkbox" id="ex-dim" /> Includi quote e testo</label>
+          <label class="check"><input type="checkbox" id="ex-dim" checked /> Includi quote e testi nel file tecnico</label>
+          <label class="check"><input type="checkbox" id="ex-photo-underlay" /> Includi foto di riferimento nel PNG</label>
           <div class="h">PNG</div>
           <div class="field">
             <label>Sfondo</label>
@@ -286,9 +287,14 @@
           <button class="btn-block" id="ex-svg">Scarica SVG</button>
           <button class="btn-block ghost" id="ex-dwg">Info DWG…</button>
 
-          <div class="h">Foto → CAD</div>
-          <p class="help-list" style="margin-bottom:10px">Come in Ragnar: foto + testo (misure, spessore, maniglia…) → schizzo editabile. Raffina a parole nella riga comando.</p>
-          <button class="btn-block accent" id="ex-photo">Nuovo da foto + testo…</button>
+          <div class="h">Foto → disegno tecnico rapido</div>
+          <p class="help-list" style="margin-bottom:10px">Elaborazione locale nel browser. Inserisci una misura reale: con una quota si conserva il rapporto della foto, con due quote si fissano entrambe le dimensioni.</p>
+          <button class="btn-block accent" id="ex-photo">Carica immagine e calibra…</button>
+          <div class="photo-quality" id="photo-quality" hidden>
+            <div class="quality-title" id="photo-quality-title"></div>
+            <p id="photo-quality-summary"></p>
+            <ul id="photo-quality-list"></ul>
+          </div>
           <div class="h">Modelli pronti</div>
           <button class="tpl" data-tpl="door"><b>Porta da foto</b><span>Anta 800×2100 mm, maniglia H1019</span></button>
           <button class="tpl" data-tpl="plate"><b>Piastra forata</b><span>80×50 mm, 4 fori Ø6</span></button>
@@ -324,7 +330,7 @@
       <div class="studio-head">
         <div>
           <div class="studio-kicker">Foto → CAD</div>
-          <h2>Carica un’immagine, descrivi il pezzo</h2>
+          <h2>Immagine → prospetto CAD quotato</h2>
         </div>
         <button class="icon-btn" id="studio-close" title="Chiudi">×</button>
       </div>
@@ -332,18 +338,39 @@
         <div class="studio-drop" id="studio-drop">
           <img id="studio-preview" alt="" hidden />
           <div class="studio-drop-msg" id="studio-drop-msg">
-            Trascina qui una foto, uno schizzo o un disegno tecnico<br /><span>oppure clicca per scegliere il file</span>
+            Trascina qui una foto frontale, uno schizzo o un disegno tecnico<br /><span>oppure clicca per scegliere il file · elaborazione locale</span>
           </div>
         </div>
         <div class="studio-form">
-          <label for="studio-prompt">Cosa vuoi ottenere</label>
-          <textarea id="studio-prompt" rows="6" placeholder="Porta interna 800×2100 mm, spessore 40, maniglia a 1050 a sinistra…"></textarea>
+          <label for="studio-prompt">Tipo di pezzo e dettagli (facoltativo)</label>
+          <textarea id="studio-prompt" rows="4" placeholder="Porta interna, maniglia a 1019 mm a sinistra…"></textarea>
           <div class="field">
-            <label>Spessore estrusione (mm)</label>
-            <input type="number" id="studio-th" min="0.2" step="0.5" value="40" />
+            <label for="studio-kind">Tipo immagine</label>
+            <select id="studio-kind">
+              <option value="auto">Rileva automaticamente</option>
+              <option value="door">Porta (anta e ferramenta)</option>
+              <option value="rect">Oggetto rettangolare</option>
+              <option value="sketch">Schizzo / disegno tecnico</option>
+            </select>
           </div>
-          <p class="help-list">La foto dà forma e proporzioni. Il testo dà le misure. Poi raffini a parole e esporti DXF (Onshape) o STL.</p>
-          <button class="btn-block accent" id="studio-go">Genera modello</button>
+          <div class="row studio-dimensions">
+            <div class="field">
+              <label for="studio-w">Larghezza nota (mm)</label>
+              <input type="number" id="studio-w" min="0.01" step="0.01" placeholder="es. 800" />
+            </div>
+            <div class="field">
+              <label for="studio-h">Altezza nota (mm)</label>
+              <input type="number" id="studio-h" min="0.01" step="0.01" placeholder="es. 2100" />
+            </div>
+          </div>
+          <p class="help-list scale-help">Per una porta le quote si riferiscono all’anta. Una sola misura calibra la scala e conserva il rapporto della foto; due misure fissano larghezza e altezza separatamente.</p>
+          <div class="field">
+            <label for="studio-th">Spessore estrusione / profondità (mm)</label>
+            <input type="number" id="studio-th" min="0.2" step="0.5" placeholder="40" />
+          </div>
+          <label class="check estimate-check"><input type="checkbox" id="studio-estimate" /> Non conosco le misure: usa una scala solo indicativa</label>
+          <p class="help-list local-note">La foto non permette di dedurre profondità o correggere la prospettiva. Controlla sempre le quote prima di esportare.</p>
+          <button class="btn-block accent" id="studio-go">Genera disegno</button>
         </div>
       </div>
     </div>

@@ -85,17 +85,11 @@ esempio restano come materiale del CAD 2D.
 
 ### Test
 
-La pipeline è coperta da test in Node (senza browser):
+La pipeline principale e il CAD rapido hanno test automatici in Node, senza dipendenze browser:
 
 ```bash
-node dev/test-precision.js    # analisi: linee, simmetria, ferramenta
-node dev/test-models.js       # stima parametri dalla foto
-node dev/e2e.js               # foto → tavola → DXF → STL → brief con verifiche
-node dev/test-studio.js       # la stessa pipeline dentro studio.js, con DOM simulato
-node --test tests/trace.test.js # calibrazione ed export del CAD rapido
+node --test tests/*.test.js
 ```
-
-Legge la foto via `dev/porta.ppm` (`convert porta.jpg -depth 8 porta.ppm`).
 
 ### Limiti di misura
 
