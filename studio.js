@@ -555,6 +555,12 @@
     if (params.get("demo") === "1") loadURL("porta.jpg");
   }
 
+  /* aggancio per i test automatici (dev/test-ui.js) */
+  window.__studio = {
+    state, init, setImage, runAnalysis, regenerate, renderSheet, renderParams,
+    detailZone, dxfState, exportDXF, exportSTL, exportSVG, exportBrief
+  };
+
   if (!(typeof window !== "undefined" && window.__SCHIZZO_NO_INIT__)) {
     document.addEventListener("DOMContentLoaded", init);
   }

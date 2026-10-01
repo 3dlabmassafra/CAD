@@ -74,7 +74,7 @@ python3 -m http.server 8080 --bind 0.0.0.0
 | `studio.js` | Il wizard: caricamento, analisi, pannello misure, esportazioni |
 | `studio.css` | Interfaccia della nuova app |
 | `app.js` · `export.js` · `trace.js` · `styles.css` | Il CAD 2D (Schizzo) e i suoi export DXF/STL/SVG |
-| `esempi/` | Tavola, DXF e brief generati dalla foto della porta |
+| `esempi/` | Tavola (SVG + PNG), DXF e brief generati dalla foto della porta |
 
 ## Nota sui file già presenti
 
