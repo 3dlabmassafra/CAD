@@ -1,0 +1,34 @@
+{
+  "modello": "door",
+  "parametri": {
+    "antaW": 800,
+    "antaH": 2100,
+    "battL": 43,
+    "battR": 43,
+    "battT": 55,
+    "copL": 72,
+    "copR": 72,
+    "copT": 70.5,
+    "manigliaH": 1019,
+    "backset": 45,
+    "rosetta": 50,
+    "chiave": 89.5,
+    "manigliaL": 113,
+    "cerniere": 3,
+    "lato": "sinistra",
+    "spessore": 40,
+    "altezzaDavanzale": 0
+  },
+  "ingombro": [
+    1030,
+    2225.5
+  ],
+  "spessore": 40,
+  "controlli": [
+    "OK Scala coerente X/Y: X 1.669 · Y 1.655 mm/px · scarto 0.84%",
+    "OK Rosetta e bocchetta coerenti: rosetta 30 px · bocchetta 29×29 px",
+    "OK Altezza maniglia plausibile: 1019 mm da terra (intervallo tipico 950–1100)",
+    "OK Backset plausibile: 45 mm (tipico 40–60)",
+    "OK Coprifilo plausibile: 72 mm"
+  ]
+}
